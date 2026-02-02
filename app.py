@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # Financial Markets Dashboard
 # Author: Vasiliy Vaselkov
 # GitHub: vasavaselkov98-lgtm/demo-stockpeers
@@ -12,10 +12,10 @@ from modules.ui_components import (
 from modules.data_loader import load_market_data
 from modules.charts import create_main_chart, create_comparison_charts
 
-# Конфигурация страницы
+# ÐšÐ¾Ð½Ñ„Ð¸Ð³ÑƒÑ€Ð°Ñ†Ð¸Ñ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹
 st.set_page_config(
     page_title="VV Markets Dashboard",
-    page_icon="📈",
+    page_icon="ðŸ“ˆ",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -25,10 +25,10 @@ st.set_page_config(
     }
 )
 
-# Инициализация состояния
+# Ð˜Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð°Ñ†Ð¸Ñ ÑÐ¾ÑÑ‚Ð¾ÑÐ½Ð¸Ñ
 initialize_session_state()
 
-# Загрузка CSS
+# Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ° CSS
 def load_css():
     st.markdown("""
     <style>
@@ -51,12 +51,12 @@ def load_css():
 
 load_css()
 
-# Главная страница
+# Ð“Ð»Ð°Ð²Ð½Ð°Ñ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ð°
 def main():
-    # Заголовок с бейджем GitHub
+    # Ð—Ð°Ð³Ð¾Ð»Ð¾Ð²Ð¾Ðº Ñ Ð±ÐµÐ¹Ð´Ð¶ÐµÐ¼ GitHub
     st.markdown("""
     <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px;">
-        <h1 style="margin: 0; color: #FF4B4B;">📊 VV Markets Dashboard</h1>
+        <h1 style="margin: 0; color: #FF4B4B;">ðŸ“Š VV Markets Dashboard</h1>
         <a href="https://github.com/vasavaselkov98-lgtm/demo-stockpeers" target="_blank">
             <img src="https://img.shields.io/badge/GitHub-Repository-blue?logo=github" style="height: 28px;">
         </a>
@@ -77,7 +77,7 @@ def main():
     with st.sidebar:
         render_sidebar()
     
-    # Основное содержимое
+    # ÐžÑÐ½Ð¾Ð²Ð½Ð¾Ðµ ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ð¼Ð¾Ðµ
     render_main_content()
 
 if __name__ == "__main__":

@@ -1,1 +1,1 @@
-   import streamlit as stst.title("📈 Analysis")st.write("Analysis page")
+﻿   import streamlit as stst.title("ðŸ“ˆ Analysis")st.write("Analysis page")

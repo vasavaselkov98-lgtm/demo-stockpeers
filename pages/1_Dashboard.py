@@ -1,1 +1,1 @@
-   import streamlit as stst.title("📊 Dashboard")st.write("Main dashboard")
+﻿   import streamlit as stst.title("ðŸ“Š Dashboard")st.write("Main dashboard")

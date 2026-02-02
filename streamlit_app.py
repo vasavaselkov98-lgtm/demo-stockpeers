@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # Copyright 2024-2025 Streamlit Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -355,3 +355,4 @@ for i, ticker in enumerate(tickers):
 """
 
 data
+

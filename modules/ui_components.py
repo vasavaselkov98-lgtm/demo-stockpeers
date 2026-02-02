@@ -1,1 +1,324 @@
-    import streamlit as stimport pandas as pdfrom config.markets_config import MARKET_SECTIONS, TIME_HORIZONSfrom modules.data_loader import load_market_datafrom modules.charts import create_main_chart, create_comparison_chartsdef initialize_session_state():    """Инициализация состояния сессии"""    defaults = {        'selected_market': 'Stocks',        'selected_tickers': MARKET_SECTIONS['Stocks']['default'],        'time_horizon': '6M',        'auto_refresh': False,        'chart_theme': 'dark',        'show_raw_data': False,        'last_update': None    }        for key, value in defaults.items():        if key not in st.session_state:            st.session_state[key] = valuedef render_sidebar():    """Рендер сайдбара"""    st.sidebar.title("📁 Market Navigator")        # Выбор категории рынков    st.sidebar.markdown("### 📂 Market Categories")        # Стилизованные кнопки для категорий    categories = list(MARKET_SECTIONS.keys())    cols = st.sidebar.columns(2)        for idx, category in enumerate(categories):        col_idx = idx % 2        with cols[col_idx]:            icon = MARKET_SECTIONS[category]['icon']            if st.button(                f"{icon} {category}",                key=f"cat_{category}",                use_container_width=True,                type="primary" if st.session_state.selected_market == category else "secondary"            ):                st.session_state.selected_market = category                st.session_state.selected_tickers = MARKET_SECTIONS[category]['default']                st.rerun()        st.sidebar.divider()        # Выбор тикеров в выбранной категории    current_market = st.session_state.selected_market    market_info = MARKET_SECTIONS[current_market]        st.sidebar.markdown(f"### {market_info['icon']} {current_market}")    st.sidebar.caption(market_info['description'])        # Multi-select для тикеров    selected_tickers = st.sidebar.multiselect(        "Select Instruments",        options=market_info['tickers'],        default=st.session_state.selected_tickers,        format_func=lambda x: f"{x} - {market_info.get('display_names', {}).get(x, x)}",        key="ticker_selector"    )        if selected_tickers != st.session_state.selected_tickers:        st.session_state.selected_tickers = selected_tickers        st.rerun()        st.sidebar.divider()        # Настройки времени    st.sidebar.markdown("### ⏰ Time Settings")        # Быстрый выбор периода    time_cols = st.sidebar.columns(3)    quick_periods = ['1D', '1W', '1M', '3M', '6M', '1Y']        for i, period in enumerate(quick_periods):        col_idx = i % 3        with time_cols[col_idx]:            if st.button(                period,                key=f"quick_{period}",                use_container_width=True,                type="primary" if st.session_state.time_horizon == period else "secondary"            ):                st.session_state.time_horizon = period                st.rerun()        # Расширенный выбор    selected_horizon = st.sidebar.selectbox(        "Detailed Period",        options=list(TIME_HORIZONS.keys()),        index=list(TIME_HORIZONS.keys()).index(st.session_state.time_horizon),        key="horizon_select"    )        if selected_horizon != st.session_state.time_horizon:        st.session_state.time_horizon = selected_horizon        st.rerun()        st.sidebar.divider()        # Настройки обновления    st.sidebar.markdown("### ⚙️ Settings")        col1, col2 = st.sidebar.columns(2)    with col1:        auto_refresh = st.checkbox(            "🔄 Auto-refresh",            value=st.session_state.auto_refresh,            key="auto_refresh_check"        )    with col2:        show_raw = st.checkbox(            "📋 Raw Data",            value=st.session_state.show_raw_data,            key="show_raw_check"        )        if auto_refresh != st.session_state.auto_refresh:        st.session_state.auto_refresh = auto_refresh    if show_raw != st.session_state.show_raw_data:        st.session_state.show_raw_data = show_raw        # Информация об обновлении    if st.session_state.get('last_update'):        st.sidebar.caption(f"Last update: {st.session_state.last_update}")        st.sidebar.divider()        # Ссылка на GitHub    st.sidebar.markdown("""    <div style="text-align: center;">        <a href="https://github.com/vasavaselkov98-lgtm/demo-stockpeers" target="_blank">            <img src="https://img.shields.io/badge/⭐_Star_on_GitHub-181717?style=for-the-badge&logo=github" style="width: 100%;">        </a>    </div>    """, unsafe_allow_html=True)def render_main_content():    """Рендер основного контента"""    if not st.session_state.selected_tickers:        st.warning("⚠️ Please select at least one instrument from the sidebar")        return        # Загрузка данных    with st.spinner(f"Loading {st.session_state.selected_market} data..."):        data = load_market_data(            tickers=st.session_state.selected_tickers,            period=TIME_HORIZONS[st.session_state.time_horizon],            auto_refresh=st.session_state.auto_refresh        )        if data is None or data.empty:        st.error("Failed to load data. Please try again.")        return        # Обновление времени последнего обновления    from datetime import datetime    st.session_state.last_update = datetime.now().strftime("%H:%M:%S")        # Верхняя панель с метриками    render_metrics_panel(data)        # Основной график    render_main_chart_section(data)        # Детальный анализ    if len(st.session_state.selected_tickers) > 1:        render_detailed_analysis(data)        # Сырые данные    if st.session_state.show_raw_data:        render_raw_data_section(data)def render_metrics_panel(data):    """Рендер панели с метриками"""    if data.empty:        return        normalized = data.div(data.iloc[0])    latest_norm = normalized.iloc[-1]        st.markdown("### 📈 Performance Metrics")        # Расчет метрик    metrics_data = []    for ticker in data.columns:        initial_price = data[ticker].iloc[0]        current_price = data[ticker].iloc[-1]        change_pct = ((current_price / initial_price) - 1) * 100                # Находим максимум и минимум        max_price = data[ticker].max()        min_price = data[ticker].min()        from_max = ((current_price / max_price) - 1) * 100 if max_price > 0 else 0                metrics_data.append({            'Ticker': ticker,            'Price': current_price,            'Change %': change_pct,            'From High %': from_max,            'Volatility': data[ticker].pct_change().std() * 100        })        # Создаем DataFrame и сортируем    metrics_df = pd.DataFrame(metrics_data)    metrics_df = metrics_df.sort_values('Change %', ascending=False)        # Отображаем в виде карточек    cols = st.columns(len(metrics_df))    for idx, (_, row) in enumerate(metrics_df.iterrows()):        with cols[idx]:            delta_color = "normal" if row['Change %'] > 0 else "inverse"                        st.metric(                label=row['Ticker'],                value=f"${row['Price']:.2f}",                delta=f"{row['Change %']:.1f}%",                delta_color=delta_color            )        # Статистика    with st.expander("📊 Detailed Statistics"):        st.dataframe(            metrics_df.style.format({                'Price': '${:.2f}',                'Change %': '{:.1f}%',                'From High %': '{:.1f}%',                'Volatility': '{:.1f}%'            }).background_gradient(subset=['Change %'], cmap='RdYlGn'),            use_container_width=True        )def render_main_chart_section(data):    """Рендер основного графика"""    st.markdown("### 📊 Normalized Performance")        # Создаем табы для разных видов графиков    tab1, tab2, tab3 = st.tabs(["📈 Line Chart", "📊 Area Chart", "📉 Relative Strength"])        with tab1:        chart = create_main_chart(data, chart_type='line')        st.altair_chart(chart, use_container_width=True)        with tab2:        chart = create_main_chart(data, chart_type='area')        st.altair_chart(chart, use_container_width=True)        with tab3:        chart = create_main_chart(data, chart_type='rs')        st.altair_chart(chart, use_container_width=True)        # Информация под графиком    col1, col2, col3 = st.columns(3)    with col1:        st.caption(f"**Period:** {st.session_state.time_horizon}")    with col2:        st.caption(f"**Instruments:** {len(data.columns)}")    with col3:        if st.session_state.auto_refresh:            st.success("🔄 Auto-refresh enabled")def render_detailed_analysis(data):    """Рендер детального анализа"""    st.markdown("### 🔍 Peer Comparison Analysis")        # Создаем сравнения для каждого тикера    comparison_charts = create_comparison_charts(data)        # Отображаем в виде сетки    num_cols = 2    charts_per_row = 2        for i in range(0, len(comparison_charts), charts_per_row):        cols = st.columns(num_cols)        for j in range(charts_per_row):            if i + j < len(comparison_charts):                with cols[j % num_cols]:                    st.altair_chart(comparison_charts[i + j], use_container_width=True)def render_raw_data_section(data):    """Рендер секции с сырыми данными"""    st.markdown("### 📁 Raw Data")        # Табы для разных представлений    tab1, tab2 = st.tabs(["📋 Table View", "📈 Price History"])        with tab1:        st.dataframe(            data.tail(50).style.format("${:.2f}"),            use_container_width=True,            height=400        )                # Кнопки экспорта        col1, col2 = st.columns(2)        with col1:            csv = data.reset_index().to_csv(index=False)            st.download_button(                label="📥 Download CSV",                data=csv,                file_name=f"market_data_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",                mime="text/csv"            )        with col2:            json_str = data.reset_index().to_json(orient='records', date_format='iso')            st.download_button(                label="📥 Download JSON",                data=json_str,                file_name=f"market_data_{pd.Timestamp.now().strftime('%Y%m%d')}.json",                mime="application/json"            )        with tab2:        # Price history heatmap        st.dataframe(            data.pct_change().tail(20).style.format("{:.2%}").background_gradient(                cmap='RdYlGn', vmin=-0.05, vmax=0.05            ),            use_container_width=True        )
+import streamlit as st
+import pandas as pd
+from config.markets_config import MARKET_SECTIONS, TIME_HORIZONS
+from modules.data_loader import load_market_data
+from modules.charts import create_main_chart, create_comparison_charts
+
+def initialize_session_state():
+    """Инициализация состояния сессии"""
+    defaults = {
+        'selected_market': 'Stocks',
+        'selected_tickers': MARKET_SECTIONS['Stocks']['default'],
+        'time_horizon': '6M',
+        'auto_refresh': False,
+        'chart_theme': 'dark',
+        'show_raw_data': False,
+        'last_update': None
+    }
+    
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+def render_sidebar():
+    """Рендер сайдбара"""
+    st.sidebar.title("📁 Market Navigator")
+    
+    # Выбор категории рынков
+    st.sidebar.markdown("### 📂 Market Categories")
+    
+    # Стилизованные кнопки для категорий
+    categories = list(MARKET_SECTIONS.keys())
+    cols = st.sidebar.columns(2)
+    
+    for idx, category in enumerate(categories):
+        col_idx = idx % 2
+        with cols[col_idx]:
+            icon = MARKET_SECTIONS[category]['icon']
+            if st.button(
+                f"{icon} {category}",
+                key=f"cat_{category}",
+                use_container_width=True,
+                type="primary" if st.session_state.selected_market == category else "secondary"
+            ):
+                st.session_state.selected_market = category
+                st.session_state.selected_tickers = MARKET_SECTIONS[category]['default']
+                st.rerun()
+    
+    st.sidebar.divider()
+    
+    # Выбор тикеров в выбранной категории
+    current_market = st.session_state.selected_market
+    market_info = MARKET_SECTIONS[current_market]
+    
+    st.sidebar.markdown(f"### {market_info['icon']} {current_market}")
+    st.sidebar.caption(market_info['description'])
+    
+    # Multi-select для тикеров
+    selected_tickers = st.sidebar.multiselect(
+        "Select Instruments",
+        options=market_info['tickers'],
+        default=st.session_state.selected_tickers,
+        format_func=lambda x: f"{x} - {market_info.get('display_names', {}).get(x, x)}",
+        key="ticker_selector"
+    )
+    
+    if selected_tickers != st.session_state.selected_tickers:
+        st.session_state.selected_tickers = selected_tickers
+        st.rerun()
+    
+    st.sidebar.divider()
+    
+    # Настройки времени
+    st.sidebar.markdown("### ⏰ Time Settings")
+    
+    # Быстрый выбор периода
+    time_cols = st.sidebar.columns(3)
+    quick_periods = ['1D', '1W', '1M', '3M', '6M', '1Y']
+    
+    for i, period in enumerate(quick_periods):
+        col_idx = i % 3
+        with time_cols[col_idx]:
+            if st.button(
+                period,
+                key=f"quick_{period}",
+                use_container_width=True,
+                type="primary" if st.session_state.time_horizon == period else "secondary"
+            ):
+                st.session_state.time_horizon = period
+                st.rerun()
+    
+    # Расширенный выбор
+    selected_horizon = st.sidebar.selectbox(
+        "Detailed Period",
+        options=list(TIME_HORIZONS.keys()),
+        index=list(TIME_HORIZONS.keys()).index(st.session_state.time_horizon),
+        key="horizon_select"
+    )
+    
+    if selected_horizon != st.session_state.time_horizon:
+        st.session_state.time_horizon = selected_horizon
+        st.rerun()
+    
+    st.sidebar.divider()
+    
+    # Настройки обновления
+    st.sidebar.markdown("### ⚙️ Settings")
+    
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        auto_refresh = st.checkbox(
+            "🔄 Auto-refresh",
+            value=st.session_state.auto_refresh,
+            key="auto_refresh_check"
+        )
+    with col2:
+        show_raw = st.checkbox(
+            "📋 Raw Data",
+            value=st.session_state.show_raw_data,
+            key="show_raw_check"
+        )
+    
+    if auto_refresh != st.session_state.auto_refresh:
+        st.session_state.auto_refresh = auto_refresh
+    if show_raw != st.session_state.show_raw_data:
+        st.session_state.show_raw_data = show_raw
+    
+    # Информация об обновлении
+    if st.session_state.get('last_update'):
+        st.sidebar.caption(f"Last update: {st.session_state.last_update}")
+    
+    st.sidebar.divider()
+    
+    # Ссылка на GitHub
+    st.sidebar.markdown("""
+    <div style="text-align: center;">
+        <a href="https://github.com/vasavaselkov98-lgtm/demo-stockpeers" target="_blank">
+            <img src="https://img.shields.io/badge/⭐_Star_on_GitHub-181717?style=for-the-badge&logo=github" style="width: 100%;">
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_main_content():
+    """Рендер основного контента"""
+    if not st.session_state.selected_tickers:
+        st.warning("⚠️ Please select at least one instrument from the sidebar")
+        return
+    
+    # Загрузка данных
+    with st.spinner(f"Loading {st.session_state.selected_market} data..."):
+        data = load_market_data(
+            tickers=st.session_state.selected_tickers,
+            period=TIME_HORIZONS[st.session_state.time_horizon],
+            auto_refresh=st.session_state.auto_refresh
+        )
+    
+    if data is None or data.empty:
+        st.error("Failed to load data. Please try again.")
+        return
+    
+    # Обновление времени последнего обновления
+    from datetime import datetime
+    st.session_state.last_update = datetime.now().strftime("%H:%M:%S")
+    
+    # Верхняя панель с метриками
+    render_metrics_panel(data)
+    
+    # Основной график
+    render_main_chart_section(data)
+    
+    # Детальный анализ
+    if len(st.session_state.selected_tickers) > 1:
+        render_detailed_analysis(data)
+    
+    # Сырые данные
+    if st.session_state.show_raw_data:
+        render_raw_data_section(data)
+
+def render_metrics_panel(data):
+    """Рендер панели с метриками"""
+    if data.empty:
+        return
+    
+    normalized = data.div(data.iloc[0])
+    latest_norm = normalized.iloc[-1]
+    
+    st.markdown("### 📈 Performance Metrics")
+    
+    # Расчет метрик
+    metrics_data = []
+    for ticker in data.columns:
+        initial_price = data[ticker].iloc[0]
+        current_price = data[ticker].iloc[-1]
+        change_pct = ((current_price / initial_price) - 1) * 100
+        
+        # Находим максимум и минимум
+        max_price = data[ticker].max()
+        min_price = data[ticker].min()
+        from_max = ((current_price / max_price) - 1) * 100 if max_price > 0 else 0
+        
+        metrics_data.append({
+            'Ticker': ticker,
+            'Price': current_price,
+            'Change %': change_pct,
+            'From High %': from_max,
+            'Volatility': data[ticker].pct_change().std() * 100
+        })
+    
+    # Создаем DataFrame и сортируем
+    metrics_df = pd.DataFrame(metrics_data)
+    metrics_df = metrics_df.sort_values('Change %', ascending=False)
+    
+    # Отображаем в виде карточек
+    cols = st.columns(len(metrics_df))
+    for idx, (_, row) in enumerate(metrics_df.iterrows()):
+        with cols[idx]:
+            delta_color = "normal" if row['Change %'] > 0 else "inverse"
+            
+            st.metric(
+                label=row['Ticker'],
+                value=f"${row['Price']:.2f}",
+                delta=f"{row['Change %']:.1f}%",
+                delta_color=delta_color
+            )
+    
+    # Статистика
+    with st.expander("📊 Detailed Statistics"):
+        st.dataframe(
+            metrics_df.style.format({
+                'Price': '${:.2f}',
+                'Change %': '{:.1f}%',
+                'From High %': '{:.1f}%',
+                'Volatility': '{:.1f}%'
+            }).background_gradient(subset=['Change %'], cmap='RdYlGn'),
+            use_container_width=True
+        )
+
+def render_main_chart_section(data):
+    """Рендер основного графика"""
+    st.markdown("### 📊 Normalized Performance")
+    
+    # Создаем табы для разных видов графиков
+    tab1, tab2, tab3 = st.tabs(["📈 Line Chart", "📊 Area Chart", "📉 Relative Strength"])
+    
+    with tab1:
+        chart = create_main_chart(data, chart_type='line')
+        st.altair_chart(chart, use_container_width=True)
+    
+    with tab2:
+        chart = create_main_chart(data, chart_type='area')
+        st.altair_chart(chart, use_container_width=True)
+    
+    with tab3:
+        chart = create_main_chart(data, chart_type='rs')
+        st.altair_chart(chart, use_container_width=True)
+    
+    # Информация под графиком
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.caption(f"**Period:** {st.session_state.time_horizon}")
+    with col2:
+        st.caption(f"**Instruments:** {len(data.columns)}")
+    with col3:
+        if st.session_state.auto_refresh:
+            st.success("🔄 Auto-refresh enabled")
+
+def render_detailed_analysis(data):
+    """Рендер детального анализа"""
+    st.markdown("### 🔍 Peer Comparison Analysis")
+    
+    # Создаем сравнения для каждого тикера
+    comparison_charts = create_comparison_charts(data)
+    
+    # Отображаем в виде сетки
+    num_cols = 2
+    charts_per_row = 2
+    
+    for i in range(0, len(comparison_charts), charts_per_row):
+        cols = st.columns(num_cols)
+        for j in range(charts_per_row):
+            if i + j < len(comparison_charts):
+                with cols[j % num_cols]:
+                    st.altair_chart(comparison_charts[i + j], use_container_width=True)
+
+def render_raw_data_section(data):
+    """Рендер секции с сырыми данными"""
+    st.markdown("### 📁 Raw Data")
+    
+    # Табы для разных представлений
+    tab1, tab2 = st.tabs(["📋 Table View", "📈 Price History"])
+    
+    with tab1:
+        st.dataframe(
+            data.tail(50).style.format("${:.2f}"),
+            use_container_width=True,
+            height=400
+        )
+        
+        # Кнопки экспорта
+        col1, col2 = st.columns(2)
+        with col1:
+            csv = data.reset_index().to_csv(index=False)
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv,
+                file_name=f"market_data_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+        with col2:
+            json_str = data.reset_index().to_json(orient='records', date_format='iso')
+            st.download_button(
+                label="📥 Download JSON",
+                data=json_str,
+                file_name=f"market_data_{pd.Timestamp.now().strftime('%Y%m%d')}.json",
+                mime="application/json"
+            )
+    
+    with tab2:
+        # Price history heatmap
+        st.dataframe(
+            data.pct_change().tail(20).style.format("{:.2%}").background_gradient(
+                cmap='RdYlGn', vmin=-0.05, vmax=0.05
+            ),
+            use_container_width=True
+        )
