@@ -1,0 +1,326 @@
+# pages/6_Indicators.py - Indicators Library
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+st.set_page_config(
+    page_title="Indicators Library",
+    page_icon="🧠",
+    layout="wide"
+)
+
+# Заголовок
+st.markdown("""
+<h1 style='text-align: center; color: #1f77b4; margin-bottom: 0.5rem;'>
+🧠 Indicators Library
+</h1>
+<p style='text-align: center; color: #666; margin-bottom: 2rem;'>
+Collection of technical indicators and custom tools
+</p>
+""", unsafe_allow_html=True)
+
+# Вкладки
+tab1, tab2, tab3 = st.tabs(["📊 Built-in Indicators", "🔧 Custom Indicators", "📚 Documentation"])
+
+with tab1:
+    st.subheader("Built-in Technical Indicators")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        ### 📈 Trend Indicators
+        
+        **Simple Moving Average (SMA)**
+        - **Description:** Average price over a specified period
+        - **Formula:** SMA = (P1 + P2 + ... + Pn) / n
+        - **Common Periods:** 20, 50, 100, 200
+        - **Usage:** Identify trends, support/resistance
+        
+        **Exponential Moving Average (EMA)**
+        - **Description:** Weighted average giving more importance to recent prices
+        - **Formula:** EMA = Price(t) * k + EMA(y) * (1 - k)
+        - **Common Periods:** 12, 26
+        - **Usage:** Faster response to price changes
+        
+        **Moving Average Convergence Divergence (MACD)**
+        - **Description:** Trend-following momentum indicator
+        - **Components:** MACD Line, Signal Line, Histogram
+        - **Usage:** Identify trend changes and momentum
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### 📊 Momentum Indicators
+        
+        **Relative Strength Index (RSI)**
+        - **Description:** Measures speed and change of price movements
+        - **Formula:** RSI = 100 - [100 / (1 + RS)]
+        - **Range:** 0-100 (Oversold/Overbought)
+        - **Common Period:** 14
+        
+        **Stochastic Oscillator**
+        - **Description:** Compares closing price to price range
+        - **Formula:** %K = 100 * (C - L14) / (H14 - L14)
+        - **Range:** 0-100
+        - **Usage:** Identify overbought/oversold conditions
+        
+        **Bollinger Bands**
+        - **Description:** Volatility bands around moving average
+        - **Components:** Middle Band (SMA), Upper Band, Lower Band
+        - **Usage:** Identify volatility and potential reversals
+        """)
+    
+    # Пример кода
+    with st.expander("📝 Code Examples", expanded=False):
+        st.code("""
+# Example: Calculate SMA in Python
+import pandas as pd
+import numpy as np
+
+def calculate_sma(prices, period=20):
+    return prices.rolling(window=period).mean()
+
+# Example: Calculate RSI
+def calculate_rsi(prices, period=14):
+    delta = prices.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+        """, language="python")
+
+with tab2:
+    st.subheader("Custom Indicators Builder")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Create Custom Indicator")
+        
+        indicator_name = st.text_input("Indicator Name", "My Custom Indicator")
+        indicator_type = st.selectbox("Indicator Type", 
+                                    ["Trend", "Momentum", "Volatility", "Volume", "Custom"])
+        
+        # Parameters
+        st.markdown("**Parameters**")
+        param1_name = st.text_input("Parameter 1 Name", "period")
+        param1_default = st.number_input("Parameter 1 Default", value=14, min_value=1, max_value=200)
+        
+        param2_name = st.text_input("Parameter 2 Name", "multiplier")
+        param2_default = st.number_input("Parameter 2 Default", value=2.0, min_value=0.1, max_value=10.0, step=0.1)
+        
+        # Code template
+        st.markdown("**Calculation Logic**")
+        indicator_code = st.text_area("Python Code", 
+            f"""def calculate_indicator(prices, {param1_name}={param1_default}, {param2_name}={param2_default}):
+    # Your calculation logic here
+    # Example: Simple moving average
+    return prices.rolling(window={param1_name}).mean()""",
+            height=200)
+    
+    with col2:
+        st.markdown("### Preview & Test")
+        
+        if st.button("🚀 Test Indicator", use_container_width=True):
+            # Create sample data for testing
+            dates = pd.date_range('2023-01-01', periods=100, freq='D')
+            sample_prices = 100 + np.cumsum(np.random.randn(100) * 2)
+            sample_df = pd.DataFrame({'Close': sample_prices}, index=dates)
+            
+            # Try to execute the custom code
+            try:
+                # Create a safe execution environment
+                namespace = {'pd': pd, 'np': np}
+                exec(indicator_code, namespace)
+                
+                # Get the function
+                calculate_func = namespace['calculate_indicator']
+                
+                # Calculate indicator
+                result = calculate_func(sample_df['Close'])
+                
+                # Display results
+                st.success("✅ Indicator calculated successfully!")
+                
+                # Plot results
+                import plotly.graph_objects as go
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=sample_df.index, y=sample_df['Close'], 
+                                        name='Price', line=dict(color='blue')))
+                fig.add_trace(go.Scatter(x=result.index, y=result, 
+                                        name=indicator_name, line=dict(color='red', dash='dash')))
+                
+                fig.update_layout(
+                    title=f"{indicator_name} - Test Results",
+                    height=400,
+                    xaxis_title="Date",
+                    yaxis_title="Value"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Show statistics
+                col_stat1, col_stat2, col_stat3 = st.columns(3)
+                with col_stat1:
+                    st.metric("Last Value", f"{result.iloc[-1]:.2f}")
+                with col_stat2:
+                    st.metric("Mean", f"{result.mean():.2f}")
+                with col_stat3:
+                    st.metric("Std Dev", f"{result.std():.2f}")
+                    
+            except Exception as e:
+                st.error(f"Error testing indicator: {str(e)}")
+        
+        # Save indicator
+        st.markdown("### Save Indicator")
+        if st.button("💾 Save to Library", use_container_width=True, type="primary"):
+            st.success(f"Indicator '{indicator_name}' saved!")
+            st.info("Note: This is a demo. In a real application, this would save to a database or file.")
+
+with tab3:
+    st.subheader("Indicators Documentation")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        ### 📖 How to Use Indicators
+        
+        **Basic Usage:**
+        1. Select instruments in Dashboard
+        2. Enable indicators in Display Settings
+        3. Configure indicator parameters
+        4. View on charts for analysis
+        
+        **Interpretation Guidelines:**
+        
+        **Trend Indicators (SMA, EMA, MACD):**
+        - **Buy Signal:** Price crosses above moving average
+        - **Sell Signal:** Price crosses below moving average
+        - **MACD:** Signal line crossovers indicate trend changes
+        
+        **Momentum Indicators (RSI, Stochastic):**
+        - **Overbought:** RSI > 70 (consider selling)
+        - **Oversold:** RSI < 30 (consider buying)
+        - **Divergence:** Price and indicator moving opposite directions
+        
+        **Volatility Indicators (Bollinger Bands):**
+        - **Expansion:** Bands widen (increased volatility)
+        - **Contraction:** Bands narrow (decreased volatility)
+        - **Squeeze:** Often precedes significant price moves
+        
+        ### 🔍 Best Practices
+        
+        1. **Combine Multiple Indicators**
+           - Use trend + momentum + volatility indicators
+           - Look for confirmation across indicators
+           - Avoid relying on single indicator
+        
+        2. **Adjust for Timeframe**
+           - Shorter periods for day trading
+           - Longer periods for investing
+           - Match indicator periods to trading style
+        
+        3. **Consider Market Conditions**
+           - Trending vs ranging markets
+           - High vs low volatility
+           - Different indicators work best in different conditions
+        
+        4. **Risk Management**
+           - Indicators provide signals, not guarantees
+           - Always use stop-loss orders
+           - Consider position sizing
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### 🎯 Quick Reference
+        
+        **Common Settings:**
+        
+        **SMA/EMA Periods:**
+        - Short-term: 5-20 periods
+        - Medium-term: 20-50 periods
+        - Long-term: 50-200 periods
+        
+        **RSI Settings:**
+        - Standard: 14 periods
+        - Oversold: < 30
+        - Overbought: > 70
+        - Extreme: < 20 or > 80
+        
+        **MACD Settings:**
+        - Fast EMA: 12 periods
+        - Slow EMA: 26 periods
+        - Signal: 9 periods
+        
+        **Bollinger Bands:**
+        - Middle: 20-period SMA
+        - Std Dev: 2
+        - Width: Adjust based on volatility
+        
+        ### 📊 Indicator Combinations
+        
+        **Trend Following:**
+        - SMA 50 + SMA 200
+        - MACD + EMA
+        
+        **Mean Reversion:**
+        - RSI + Bollinger Bands
+        - Stochastic + Support/Resistance
+        
+        **Breakout Trading:**
+        - Bollinger Bands + Volume
+        - ATR for stop-loss placement
+        """)
+        
+        # Quick calculator
+        st.markdown("---")
+        st.markdown("### 🧮 Quick Calculator")
+        
+        price_input = st.number_input("Current Price", value=100.0)
+        period_input = st.number_input("Period", value=20, min_value=1)
+        
+        if st.button("Calculate SMA", use_container_width=True):
+            # Simple SMA simulation
+            sma_value = price_input  # Simplified for demo
+            st.metric("SMA Value", f"${sma_value:.2f}")
+
+# Sidebar
+with st.sidebar:
+    st.header("⚙️ Settings")
+    
+    st.markdown("**Indicator Categories**")
+    
+    show_trend = st.checkbox("Trend Indicators", value=True)
+    show_momentum = st.checkbox("Momentum Indicators", value=True)
+    show_volatility = st.checkbox("Volatility Indicators", value=True)
+    show_volume = st.checkbox("Volume Indicators", value=False)
+    
+    st.markdown("---")
+    
+    st.markdown("**Display Options**")
+    
+    view_mode = st.selectbox("View Mode", 
+                            ["List View", "Card View", "Detailed View"],
+                            index=1)
+    
+    st.markdown("---")
+    
+    st.markdown("**Quick Actions**")
+    
+    if st.button("📊 Go to Dashboard", use_container_width=True):
+        st.switch_page("pages/1_Dashboard.py")
+    
+    if st.button("📚 Documentation", use_container_width=True):
+        st.switch_page("pages/5_Documentation.py")
+    
+    st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d')}")
+
+# Footer
+st.markdown("---")
+st.caption(f"Indicators Library • {datetime.now().year} • Educational Purpose Only")
