@@ -1,0 +1,1023 @@
+port streamlit as st
+import pandas as pd
+
+# Настройка страницы
+st.set_page_config(
+    page_title="Documentation",
+    page_icon="📚",
+    layout="wide"
+)
+
+st.title("📚 Documentation & Help")
+st.markdown("User guide, tutorials, and technical documentation")
+st.markdown("---")
+
+# Табы документации
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📖 User Guide",
+    "🎯 Tutorials", 
+    "🔧 API Reference",
+    "❓ FAQ",
+    "📞 Support"
+])
+
+with tab1:
+    st.header("User Guide")
+    
+    st.markdown("""
+    ## Getting Started
+    
+    ### 1. Launch the Application
+    After installation, launch the application using:
+    ```
+    streamlit run app.py
+    ```
+    
+    The application will open in your default web browser at `http://localhost:8501`.
+    
+    ### 2. Navigation
+    - **Dashboard**: Main analysis interface with charts and metrics
+    - **Analysis**: Advanced tools for portfolio optimization and technical analysis
+    - **Settings**: Configure preferences, API keys, and cache settings
+    - **Documentation**: This guide and reference materials
+    
+    ### 3. Basic Workflow
+    1. **Select Market**: Choose from Stocks, Crypto, Forex, Commodities, or Indices
+    2. **Choose Instruments**: Select specific tickers for analysis
+    3. **Set Time Period**: Define the date range for analysis
+    4. **Configure Settings**: Adjust intervals, benchmarks, and display options
+    5. **Load Data**: Click "Load Data" to fetch and analyze
+    6. **Explore Results**: Use tabs to view different analyses and visualizations
+    
+    ## Dashboard Features
+    
+    ### Overview Tab
+    - **Performance Charts**: Normalized price charts with benchmark comparison
+    - **Correlation Matrix**: Heatmap showing relationships between instruments
+    - **Quick Metrics**: Key performance indicators for each instrument
+    - **Data Preview**: Recent price data and descriptive statistics
+    
+    ### Performance Tab
+    - **Return Analysis**: Total and annual returns for each instrument
+    - **Risk Metrics**: Volatility, Sharpe ratio, maximum drawdown
+    - **Benchmark Comparison**: Relative performance against market indices
+    - **Return Distribution**: Histograms showing daily return patterns
+    
+    ### Risk Analysis Tab
+    - **Drawdown Analysis**: Visualization of peak-to-trough declines
+    - **Volatility Analysis**: Rolling volatility charts with configurable windows
+    - **Risk Metrics**: VaR, CVaR, Sortino ratio, skewness, and kurtosis
+    - **Stress Testing**: Impact analysis under different market scenarios
+    
+    ### Technical Analysis Tab
+    - **Indicators**: SMA, EMA, RSI, MACD, Bollinger Bands
+    - **Trading Signals**: Buy/sell signals based on indicator combinations
+    - **Real-time Analysis**: Current indicator values and market conditions
+    - **Pattern Recognition**: Common technical patterns and formations
+    
+    ## Advanced Analysis
+    
+    The Analysis section provides professional-grade tools for:
+    
+    ### Portfolio Optimization
+    - **Efficient Frontier**: Monte Carlo simulation of optimal portfolios
+    - **Risk-Return Optimization**: Maximize Sharpe ratio or minimize variance
+    - **Asset Allocation**: Optimal weight calculations for selected instruments
+    - **Constraint Management**: Custom constraints for portfolio construction
+    
+    ### Technical Analysis Suite
+    - **Comprehensive Indicators**: 20+ technical indicators
+    - **Multi-timeframe Analysis**: Daily, weekly, monthly perspectives
+    - **Signal Generation**: Automated buy/sell signal detection
+    - **Backtesting Framework**: Historical performance testing
+    
+    ### Risk Assessment
+    - **Value at Risk (VaR)**: Historical, parametric, and Monte Carlo methods
+    - **Expected Shortfall (CVaR)**: Tail risk measurement
+    - **Stress Testing**: Custom scenario analysis
+    - **Risk Attribution**: Decomposition of portfolio risk
+    
+    ## Data Management
+    
+    ### Caching System
+    - **Automatic Caching**: Data is cached locally for faster reloads
+    - **Configurable TTL**: Control how long data remains in cache
+    - **Cache Management**: Clear or optimize cache from Settings
+    - **Storage Format**: Parquet format for efficient storage
+    
+    ### Data Sources
+    - **Primary Source**: Yahoo Finance (free, no API key required)
+    - **Alternative Sources**: Alpha Vantage, Polygon.io, IEX Cloud
+    - **Fallback System**: Graceful degradation if primary source fails
+    - **Data Validation**: Automatic validation and cleaning
+    
+    ## Export & Reporting
+    
+    ### Data Export
+    - **CSV Export**: Raw price data in comma-separated format
+    - **Excel Export**: Multi-sheet Excel files with formatting
+    - **Statistics Export**: Summary statistics and metrics
+    - **Chart Export**: High-resolution chart images
+    
+    ### Report Generation
+    - **Custom Reports**: Generate analysis reports with selected metrics
+    - **PDF Export**: Professional PDF reports (planned feature)
+    - **Email Reports**: Automated report delivery (planned feature)
+    - **Scheduled Reports**: Regular report generation (planned feature)
+    
+    ## Best Practices
+    
+    ### Performance Tips
+    1. **Use Caching**: Enable caching for faster data loading
+    2. **Limit Tickers**: Start with 3-5 instruments for optimal performance
+    3. **Adjust Intervals**: Use weekly or monthly data for long-term analysis
+    4. **Clear Cache Regularly**: Maintain cache size for optimal performance
+    
+    ### Analysis Tips
+    1. **Start Simple**: Begin with basic charts before advanced analysis
+    2. **Compare Benchmarks**: Always compare against relevant market indices
+    3. **Consider Timeframes**: Different analysis for short-term vs long-term
+    4. **Validate Signals**: Use multiple indicators for confirmation
+    
+    ### Data Quality
+    1. **Check Ticker Symbols**: Ensure correct symbols for your market
+    2. **Verify Date Ranges**: Ensure data availability for selected periods
+    3. **Review Data Gaps**: Check for missing data or unusual patterns
+    4. **Cross-validate**: Compare with other sources when possible
+    """)
+
+with tab2:
+    st.header("Tutorials & Examples")
+    
+    # Quick tutorials
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🎯 Quick Start Tutorial")
+        
+        st.markdown("""
+        **Analyze Tech Stocks in 5 Minutes**
+        
+        1. **Launch Dashboard**
+           - Run `streamlit run app.py`
+           - Navigate to Dashboard
+        
+        2. **Select Market & Instruments**
+           - Market: `Stocks`
+           - Instruments: `AAPL, MSFT, GOOGL`
+        
+        3. **Set Time Period**
+           - Start: `1 year ago`
+           - End: `Today`
+        
+        4. **Configure Analysis**
+           - Interval: `1d` (daily)
+           - Benchmark: `S&P 500`
+        
+        5. **Load & Analyze**
+           - Click `Load Data`
+           - Explore different tabs
+        
+        **Expected Results:**
+        - Performance charts comparing tech stocks
+        - Correlation analysis showing relationships
+        - Risk metrics for each stock
+        - Technical indicators and signals
+        """)
+    
+    with col2:
+        st.subheader("📊 Portfolio Optimization Tutorial")
+        
+        st.markdown("""
+        **Build Optimal Portfolio in 10 Minutes**
+        
+        1. **Navigate to Analysis**
+           - Click `Analysis` in sidebar
+           - Select `Portfolio Optimization`
+        
+        2. **Select Instruments**
+           - Choose 4-6 diverse assets
+           - Example: `AAPL, JPM, GLD, TLT`
+        
+        3. **Configure Optimization**
+           - Method: `Max Sharpe Ratio`
+           - Risk-Free Rate: `2%`
+           - Portfolios: `1000`
+        
+        4. **Run Analysis**
+           - Click `Run Analysis`
+           - Wait for Monte Carlo simulation
+        
+        5. **Review Results**
+           - Efficient frontier chart
+           - Optimal portfolio weights
+           - Risk-return metrics
+        
+        **Key Insights:**
+        - Optimal asset allocation
+        - Expected risk and return
+        - Portfolio diversification benefits
+        - Alternative portfolio scenarios
+        """)
+    
+    # Advanced tutorials
+    st.subheader("🔬 Advanced Analysis Tutorials")
+    
+    tutorials = st.columns(3)
+    
+    with tutorials[0]:
+        with st.expander("Technical Analysis Masterclass"):
+            st.markdown("""
+            **Learn to use technical indicators effectively**
+            
+            1. **Indicator Selection**
+               - Trend: SMA, EMA
+               - Momentum: RSI, MACD
+               - Volatility: Bollinger Bands
+               - Volume: OBV, ATR
+            
+            2. **Timeframe Analysis**
+               - Daily for short-term
+               - Weekly for medium-term
+               - Monthly for long-term
+            
+            3. **Signal Confirmation**
+               - Multiple indicator alignment
+               - Volume confirmation
+               - Pattern recognition
+            
+            4. **Risk Management**
+               - Stop-loss levels
+               - Position sizing
+               - Risk-reward ratios
+            """)
+    
+    with tutorials[1]:
+        with st.expander("Risk Management Framework"):
+            st.markdown("""
+            **Implement professional risk management**
+            
+            1. **Risk Measurement**
+               - Value at Risk (VaR)
+               - Expected Shortfall (CVaR)
+               - Maximum Drawdown
+               - Stress Testing
+            
+            2. **Portfolio Risk**
+               - Correlation analysis
+               - Diversification benefits
+               - Risk attribution
+            
+            3. **Scenario Analysis**
+               - Market crash scenarios
+               - Volatility spikes
+               - Liquidity events
+            
+            4. **Risk Controls**
+               - Position limits
+               - Concentration limits
+               - Leverage constraints
+            """)
+    
+    with tutorials[2]:
+        with st.expander("Data Analysis Workflow"):
+            st.markdown("""
+            **Professional data analysis workflow**
+            
+            1. **Data Collection**
+               - Multiple data sources
+               - Historical data retrieval
+               - Real-time data feeds
+            
+            2. **Data Cleaning**
+               - Missing data handling
+               - Outlier detection
+               - Data normalization
+            
+            3. **Analysis & Modeling**
+               - Statistical analysis
+               - Machine learning models
+               - Time series analysis
+            
+            4. **Visualization & Reporting**
+               - Interactive charts
+               - Dashboard creation
+               - Report generation
+            """)
+    
+    # Example analyses
+    st.subheader("📈 Example Analyses")
+    
+    examples = st.columns(4)
+    
+    example_data = [
+        {
+            "title": "Tech Sector Analysis",
+            "tickers": "AAPL, MSFT, GOOGL, NVDA, AMD",
+            "period": "2 years",
+            "focus": "Growth trends and correlations"
+        },
+        {
+            "title": "Diversified Portfolio",
+            "tickers": "SPY, GLD, TLT, VNQ, IWM",
+            "period": "5 years",
+            "focus": "Asset allocation and risk"
+        },
+        {
+            "title": "Crypto Market Study",
+            "tickers": "BTC-USD, ETH-USD, SOL-USD, ADA-USD",
+            "period": "1 year",
+            "focus": "Volatility and momentum"
+        },
+        {
+            "title": "Macro Indicators",
+            "tickers": "^GSPC, ^TNX, DXY, GLD, OIL",
+            "period": "10 years",
+            "focus": "Market relationships"
+        }
+    ]
+    
+    for idx, example in enumerate(example_data):
+        with examples[idx]:
+            st.markdown(f"**{example['title']}**")
+            st.write(f"Tickers: {example['tickers']}")
+            st.write(f"Period: {example['period']}")
+            st.write(f"Focus: {example['focus']}")
+            
+            if st.button(f"Try {example['title'].split()[0]}", key=f"example_{idx}"):
+                st.session_state.example = example
+                st.info("Example loaded - navigate to Dashboard to see it")
+
+with tab3:
+    st.header("API Reference")
+    
+    st.markdown("""
+    ## Modules API Reference
+    
+    ### Data Loader Module (`modules/data_loader.py`)
+    
+    **DataLoader Class**
+    
+    Primary class for loading and caching financial data.
+    
+    ```python
+    from modules.data_loader import DataLoader, data_loader
+    
+    # Use global instance
+    data = data_loader.fetch_data("AAPL", "2023-01-01", "2024-01-01")
+    
+    # Or create custom instance
+    loader = DataLoader(cache_dir="./my_cache")
+    data = loader.fetch_data("AAPL", "2023-01-01", "2024-01-01")
+    ```
+    
+    **Key Methods:**
+    
+    - `fetch_data(ticker, start_date, end_date, interval="1d")`: Fetch single ticker
+    - `get_multiple_tickers(tickers, start_date, end_date, interval="1d")`: Fetch multiple
+    - `clear_cache(days=None)`: Clear cache
+    - `get_stats()`: Get usage statistics
+    
+    ### Charts Module (`modules/charts.py`)
+    
+    **ChartBuilder Class**
+    
+    Factory for creating financial charts.
+    
+    ```python
+    from modules.charts import ChartBuilder
+    
+    charts = ChartBuilder()
+    
+    # Create performance chart
+    fig = charts.create_performance_chart(
+        price_data, 
+        benchmark_data,
+        title="My Chart"
+    )
+    
+    # Create correlation heatmap
+    fig = charts.create_correlation_heatmap(price_data)
+    
+    # Create technical analysis chart
+    fig = charts.create_technical_chart(prices, indicators)
+    ```
+    
+    **Available Chart Types:**
+    
+    1. `create_performance_chart()`: Normalized performance
+    2. `create_correlation_heatmap()`: Correlation matrix
+    3. `create_drawdown_chart()`: Drawdown analysis
+    4. `create_volatility_chart()`: Rolling volatility
+    5. `create_technical_chart()`: Technical indicators
+    
+    ### Utils Module (`modules/utils.py`)
+    
+    **FinanceUtils Class**
+    
+    Financial calculations and utilities.
+    
+    ```python
+    from modules.utils import FinanceUtils, DataUtils
+    
+    # Calculate technical indicators
+    indicators = FinanceUtils.calculate_technical_indicators(prices)
+    
+    # Calculate risk metrics
+    risk_metrics = FinanceUtils.calculate_risk_metrics(returns)
+    
+    # Optimize portfolio
+    portfolio = FinanceUtils.optimize_portfolio(returns, method='max_sharpe')
+    
+    # Prepare and clean data
+    clean_data = DataUtils.clean_financial_data(raw_data)
+    returns = DataUtils.calculate_returns(data, method='log')
+    ```
+    
+    **Key Functions:**
+    
+    - `calculate_technical_indicators()`: 20+ technical indicators
+    - `calculate_risk_metrics()`: Risk metrics including VaR, CVaR
+    - `optimize_portfolio()`: Portfolio optimization
+    - `clean_financial_data()`: Data cleaning and preparation
+    
+    ### UI Components Module (`modules/ui_components.py`)
+    
+    **UIComponents Class**
+    
+    Reusable UI components.
+    
+    ```python
+    from modules.ui_components import UIComponents
+    
+    ui = UIComponents()
+    
+    # Create sidebar
+    config = ui.create_sidebar()
+    
+    # Create metrics display
+    ui.create_metrics_row(data, title="Performance")
+    
+    # Create data table
+    ui.create_data_table(data, title="Data Preview")
+    
+    # Create export section
+    ui.create_export_section(data)
+    ```
+    
+    ## Configuration Files
+    
+    ### Markets Configuration (`config/markets_config.py`)
+    
+    ```python
+    # Example: Adding new market
+    MARKETS_CONFIG['etfs'] = {
+        'name': 'ETFs',
+        'instruments': {
+            'SPY': 'SPDR S&P 500 ETF',
+            'QQQ': 'Invesco QQQ Trust',
+            'IWM': 'iShares Russell 2000 ETF',
+            'GLD': 'SPDR Gold Shares'
+        }
+    }
+    ```
+    
+    ### Constants (`config/constants.py`)
+    
+    ```python
+    # Modify these constants to customize behavior
+    APP_NAME = "My Financial Dashboard"
+    DEFAULT_START_DAYS = 730  # 2 years
+    COLOR_PALETTE = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4"]
+    CACHE_TTL = 7200  # 2 hours
+    ```
+    
+    ## Streamlit Pages
+    
+    ### Dashboard Page (`pages/1_Dashboard.py`)
+    
+    Main dashboard with market analysis.
+    
+    **Session State Variables:**
+    - `st.session_state.price_data`: Loaded price data
+    - `st.session_state.benchmark_data`: Benchmark data
+    - `st.session_state.market_config`: Current configuration
+    
+    ### Analysis Page (`pages/2_Analysis.py`)
+    
+    Advanced analysis tools.
+    
+    **Available Analyses:**
+    1. Portfolio Optimization
+    2. Technical Analysis
+    3. Risk Assessment
+    4. Correlation Study
+    5. Time Series Analysis
+    
+    ### Settings Page (`pages/3_Settings.py`)
+    
+    Application configuration.
+    
+    **Configuration File:** `config/user_config.json`
+    
+    ## Data Structures
+    
+    ### Price Data Format
+    
+    ```python
+    # DataFrame with instruments as columns
+    price_data = pd.DataFrame({
+        'AAPL': [150.25, 151.10, 152.50, ...],
+        'MSFT': [350.75, 352.20, 349.80, ...],
+        # ... more instruments
+    }, index=pd.DatetimeIndex(['2023-01-01', '2023-01-02', ...]))
+    ```
+    
+    ### Returns Data Format
+    
+    ```python
+    # Percentage returns (decimal format)
+    returns_data = pd.DataFrame({
+        'AAPL': [0.0056, 0.0093, -0.0032, ...],
+        'MSFT': [0.0041, -0.0068, 0.0075, ...],
+        # ... more instruments
+    }, index=pd.DatetimeIndex(['2023-01-02', '2023-01-03', ...]))
+    ```
+    
+    ### Indicators Format
+    
+    ```python
+    # Dictionary of indicator Series/DataFrames
+    indicators = {
+        'sma_20': pd.Series([...]),      # Simple Moving Average 20
+        'sma_50': pd.Series([...]),      # Simple Moving Average 50
+        'rsi': pd.Series([...]),         # Relative Strength Index
+        'macd': pd.Series([...]),        # MACD line
+        'macd_signal': pd.Series([...]), # MACD signal line
+        'bb_upper': pd.Series([...]),    # Bollinger Band upper
+        'bb_middle': pd.Series([...]),   # Bollinger Band middle
+        'bb_lower': pd.Series([...]),    # Bollinger Band lower
+    }
+    ```
+    
+    ## Error Handling
+    
+    ### Common Errors
+    
+    1. **Data Loading Errors**
+       - Check internet connection
+       - Verify ticker symbols
+       - Check date range validity
+    
+    2. **Memory Errors**
+       - Reduce number of tickers
+       - Shorten date range
+       - Clear cache
+    
+    3. **Display Errors**
+       - Check Plotly version
+       - Verify data types
+       - Check for NaN values
+    
+    ### Debug Mode
+    
+    Enable debug logging:
+    ```python
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    ```
+    
+    ## Extending the Application
+    
+    ### Adding New Analysis
+    
+    1. Create new module in `modules/`
+    2. Import in analysis page
+    3. Add to analysis type selector
+    4. Implement analysis logic
+    
+    ### Custom Visualizations
+    
+    1. Extend `ChartBuilder` class
+    2. Add new chart creation methods
+    3. Import in relevant pages
+    4. Add to UI components
+    
+    ### New Data Sources
+    
+    1. Extend `DataLoader` class
+    2. Implement data fetching logic
+    3. Add to API configuration
+    4. Update documentation
+    """)
+
+with tab4:
+    st.header("Frequently Asked Questions")
+    
+    # FAQ sections
+    faq_categories = st.selectbox(
+        "Select FAQ Category",
+        ["General", "Data & Loading", "Analysis & Charts", "Technical Issues", "Performance"]
+    )
+    
+    if faq_categories == "General":
+        st.markdown("""
+        ### General Questions
+        
+        **Q: What is VV Markets Dashboard?**
+        A: VV Markets Dashboard is a professional financial analysis platform built with Streamlit. It provides tools for market analysis, portfolio optimization, risk assessment, and technical analysis.
+        
+        **Q: Who is this application for?**
+        A: The application is designed for:
+        - Individual investors and traders
+        - Financial analysts and researchers
+        - Portfolio managers
+        - Finance students and educators
+        - Anyone interested in financial market analysis
+        
+        **Q: Is it free to use?**
+        A: Yes, the application is completely free and open-source. It uses free data sources like Yahoo Finance.
+        
+        **Q: Do I need programming knowledge to use it?**
+        A: No programming knowledge is required for basic use. The interface is designed to be user-friendly. Programming knowledge is only needed if you want to extend or modify the application.
+        
+        **Q: Can I use this for live trading?**
+        A: This is an analysis tool, not a trading platform. It provides analysis and insights but does not execute trades. Always use proper risk management and consult with financial advisors.
+        """)
+    
+    elif faq_categories == "Data & Loading":
+        st.markdown("""
+        ### Data & Loading Questions
+        
+        **Q: Where does the data come from?**
+        A: Primary data source is Yahoo Finance, which provides free historical market data. You can also configure premium data sources in Settings.
+        
+        **Q: How current is the data?**
+        A: Data is typically delayed by 15-20 minutes for free sources. For real-time data, configure premium data sources.
+        
+        **Q: Why is my data not loading?**
+        A: Common reasons:
+        1. Internet connection issues
+        2. Invalid ticker symbol
+        3. Yahoo Finance API limitations
+        4. Date range with no trading days
+        
+        **Q: How do I clear the cache?**
+        A: Go to Settings → Data & Cache → Clear Cache, or use the Clear Cache button in the sidebar.
+        
+        **Q: Can I use custom ticker symbols?**
+        A: Yes, you can enter any valid Yahoo Finance ticker symbol. The application validates symbols before loading.
+        
+        **Q: What markets are supported?**
+        A: Currently supported:
+        - Stocks (US and international)
+        - Cryptocurrencies
+        - Forex pairs
+        - Commodities
+        - Market indices
+        
+        **Q: How much historical data can I load?**
+        A: Typically up to 20+ years of daily data, depending on the instrument. Intraday data has more limitations.
+        """)
+    
+    elif faq_categories == "Analysis & Charts":
+        st.markdown("""
+        ### Analysis & Charts Questions
+        
+        **Q: What types of analysis are available?**
+        A: Available analyses include:
+        - Performance comparison
+        - Correlation analysis
+        - Risk metrics (VaR, CVaR, drawdown)
+        - Technical indicators
+        - Portfolio optimization
+        - Time series analysis
+        
+        **Q: Can I save my analysis?**
+        A: Yes, you can:
+        1. Export data as CSV or Excel
+        2. Save chart images
+        3. Generate PDF reports (planned)
+        4. Bookmark specific analyses
+        
+        **Q: How accurate are the calculations?**
+        A: Calculations use standard financial formulas and are validated against known benchmarks. However, always verify critical calculations independently.
+        
+        **Q: What technical indicators are available?**
+        A: Over 20 indicators including:
+        - Moving averages (SMA, EMA)
+        - RSI, MACD, Stochastic
+        - Bollinger Bands
+        - ATR, ADX
+        - Volume indicators
+        
+        **Q: Can I customize charts?**
+        A: Basic customization is available (colors, sizes). Advanced customization requires modifying the chart modules.
+        
+        **Q: How do I interpret correlation matrices?**
+        A: Values range from -1 to 1:
+        - 1: Perfect positive correlation
+        - 0: No correlation
+        - -1: Perfect negative correlation
+        Colors help visualization (blue = positive, red = negative).
+        """)
+    
+    elif faq_categories == "Technical Issues":
+        st.markdown("""
+        ### Technical Issues
+        
+        **Q: The application won't start**
+        A: Common solutions:
+        1. Check Python and package versions
+        2. Verify all dependencies are installed
+        3. Check port 8501 is available
+        4. Look for error messages in terminal
+        
+        **Q: I'm getting import errors**
+        A: Run: `pip install -r requirements.txt`
+        If issues persist, install packages individually.
+        
+        **Q: Charts are not displaying**
+        A: Possible issues:
+        1. Plotly not installed correctly
+        2. JavaScript disabled in browser
+        3. Data format issues
+        4. Browser compatibility
+        
+        **Q: Application is running slowly**
+        A: Try:
+        1. Reduce number of tickers
+        2. Clear cache
+        3. Use shorter date ranges
+        4. Disable auto-refresh
+        
+        **Q: Getting memory errors**
+        A: Solutions:
+        1. Load fewer instruments
+        2. Use longer intervals (weekly vs daily)
+        3. Clear cache regularly
+        4. Restart application
+        
+        **Q: Can't load certain tickers**
+        A: Some tickers may not be available on Yahoo Finance. Try:
+        1. Verify ticker symbol
+        2. Check different date range
+        3. Try alternative data source
+        4. Check if market was open
+        
+        **Q: Error messages in red boxes**
+        A: These are application errors. Check:
+        1. Error message details
+        2. Terminal output
+        3. Browser console (F12)
+        4. Log files if enabled
+        """)
+    
+    elif faq_categories == "Performance":
+        st.markdown("""
+        ### Performance Optimization
+        
+        **Q: How can I make the app faster?**
+        A: Performance tips:
+        1. **Enable caching** in Settings
+        2. **Limit tickers** to 5-10 at a time
+        3. **Use appropriate intervals** (weekly for long-term)
+        4. **Clear old cache** regularly
+        5. **Close unused tabs** in browser
+        
+        **Q: Best practices for large analyses?**
+        A: For large analyses:
+        1. Start with small subset
+        2. Use sampling for initial exploration
+        3. Process in batches if needed
+        4. Consider offline processing
+        
+        **Q: Memory usage seems high**
+        A: Normal for financial data. To reduce:
+        1. Load only needed columns
+        2. Use efficient data types
+        3. Clear session state when done
+        4. Restart app periodically
+        
+        **Q: Can I run this on a server?**
+        A: Yes, the app is server-ready:
+        1. Configure for headless operation
+        2. Set up proper caching
+        3. Monitor resource usage
+        4. Implement load balancing if needed
+        
+        **Q: Scaling for multiple users**
+        A: For multiple users:
+        1. Each user gets separate session
+        2. Shared cache reduces API calls
+        3. Consider dedicated server for >10 users
+        4. Monitor API rate limits
+        """)
+    
+    # Quick troubleshooting
+    st.markdown("---")
+    st.subheader("🛠 Quick Troubleshooting")
+    
+    issue = st.selectbox(
+        "Select your issue",
+        [
+            "Select an issue...",
+            "App won't start",
+            "Data not loading", 
+            "Charts not showing",
+            "Slow performance",
+            "Memory errors",
+            "Import errors"
+        ]
+    )
+    
+    if issue != "Select an issue...":
+        st.info(f"**Issue:** {issue}")
+        
+        if issue == "App won't start":
+            st.markdown("""
+            **Solution steps:**
+            1. Check Python is installed: `python --version`
+            2. Install requirements: `pip install -r requirements.txt`
+            3. Check port 8501 is free
+            4. Run with debug: `streamlit run app.py --logger.level=debug`
+            """)
+        
+        elif issue == "Data not loading":
+            st.markdown("""
+            **Solution steps:**
+            1. Check internet connection
+            2. Verify ticker symbols are valid
+            3. Try different date range
+            4. Clear cache in Settings
+            5. Check Yahoo Finance status
+            """)
+        
+        elif issue == "Charts not showing":
+            st.markdown("""
+            **Solution steps:**
+            1. Update Plotly: `pip install --upgrade plotly`
+            2. Check browser JavaScript is enabled
+            3. Try different browser
+            4. Check data format is correct
+            """)
+        
+        elif issue == "Slow performance":
+            st.markdown("""
+            **Solution steps:**
+            1. Reduce number of tickers
+            2. Clear cache
+            3. Use weekly instead of daily data
+            4. Close other browser tabs
+            5. Restart application
+            """)
+        
+        elif issue == "Memory errors":
+            st.markdown("""
+            **Solution steps:**
+            1. Load fewer instruments (max 5)
+            2. Use shorter date ranges
+            3. Clear all cache
+            4. Restart computer if needed
+            5. Consider 64-bit Python if using 32-bit
+            """)
+        
+        elif issue == "Import errors":
+            st.markdown("""
+            **Solution steps:**
+            1. Reinstall requirements: `pip install -r requirements.txt --force-reinstall`
+            2. Check Python version (3.8+ required)
+            3. Verify virtual environment is activated
+            4. Check PATH includes Python/Scripts
+            """)
+
+with tab5:
+    st.header("Support & Community")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📞 Get Help")
+        
+        st.markdown("""
+        **GitHub Issues**
+        - [Report Bugs](https://github.com/vasavaselkov98-lgtm/demo-stockpeers/issues)
+        - [Feature Requests](https://github.com/vasavaselkov98-lgtm/demo-stockpeers/issues)
+        - [Documentation Issues](https://github.com/vasavaselkov98-lgtm/demo-stockpeers/issues)
+        
+        **Before Reporting:**
+        1. Check existing issues
+        2. Include error messages
+        3. Provide reproduction steps
+        4. Include system information
+        
+        **Quick Support:**
+        - Check FAQ section first
+        - Search GitHub issues
+        - Review documentation
+        - Try troubleshooting steps
+        """)
+    
+    with col2:
+        st.subheader("🌐 Community")
+        
+        st.markdown("""
+        **Contributing**
+        - Fork the repository
+        - Create feature branch
+        - Submit pull request
+        - Follow code style guide
+        
+        **Development**
+        - Python 3.8+
+        - PEP 8 style guide
+        - Type hints encouraged
+        - Comprehensive testing
+        
+        **Getting Started for Developers:**
+        1. Fork repository
+        2. Clone locally
+        3. Install dependencies
+        4. Run tests
+        5. Make changes
+        6. Submit PR
+        """)
+    
+    # Contact form
+    st.markdown("---")
+    st.subheader("📧 Contact Form")
+    
+    with st.form("contact_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input("Your Name")
+            email = st.text_input("Email Address")
+        
+        with col2:
+            issue_type = st.selectbox(
+                "Issue Type",
+                ["Bug Report", "Feature Request", "Documentation", "Question", "Other"]
+            )
+            priority = st.select_slider(
+                "Priority",
+                options=["Low", "Medium", "High", "Critical"]
+            )
+        
+        description = st.text_area(
+            "Description",
+            placeholder="Describe your issue or question in detail..."
+        )
+        
+        attachments = st.file_uploader(
+            "Attachments (optional)",
+            type=["txt", "pdf", "png", "jpg", "csv"],
+            accept_multiple_files=True
+        )
+        
+        submitted = st.form_submit_button("Submit Request")
+        
+        if submitted:
+            if name and email and description:
+                st.success("✅ Request submitted successfully!")
+                st.info("You will receive a response within 2-3 business days.")
+            else:
+                st.error("❌ Please fill in all required fields.")
+    
+    # System information for support
+    st.markdown("---")
+    st.subheader("🖥 System Information")
+    
+    if st.button("Generate System Report", key="sys_report"):
+        import sys, platform
+        
+        sys_info = f"""
+        **Python Version:** {sys.version}
+        **Platform:** {platform.platform()}
+        **Processor:** {platform.processor()}
+        **Machine:** {platform.machine()}
+        **Streamlit Path:** {st.__file__}
+        **Working Directory:** {os.getcwd()}
+        """
+        
+        st.code(sys_info, language="text")
+        
+        # Package versions
+        try:
+            import pandas as pd, numpy as np, plotly as pl, yfinance as yf
+            versions = f"""
+            **Pandas:** {pd.__version__}
+            **NumPy:** {np.__version__}
+            **Plotly:** {pl.__version__}
+            **yFinance:** {yf.__version__}
+            """
+            st.code(versions, language="text")
+        except:
+            st.warning("Could not load all package versions")
+
+# Footer
+st.markdown("---")
+st.caption("""
+VV Markets Dashboard Documentation v1.0 | 
+For support, create an issue on GitHub or use the contact form above.
+""")
