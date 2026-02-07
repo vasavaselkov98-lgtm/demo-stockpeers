@@ -1,0 +1,145 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+st.set_page_config(page_title="Portfolio Analysis", layout="wide")
+st.title("💰 Portfolio Analysis")
+
+# Создаем простой PortfolioAnalyzer
+class SimplePortfolioAnalyzer:
+    def __init__(self, price_data, weights=None):
+        self.price_data = price_data
+        self.weights = weights if weights is not None else np.ones(len(price_data.columns)) / len(price_data.columns)
+    
+    def calculate_portfolio_returns(self):
+        returns = self.price_data.pct_change().dropna()
+        return returns.dot(self.weights)
+    
+    def calculate_portfolio_value(self, initial_investment=10000):
+        portfolio_returns = self.calculate_portfolio_returns()
+        portfolio_value = initial_investment * (1 + portfolio_returns).cumprod()
+        return portfolio_value
+
+# Загрузка данных
+if 'price_data' not in st.session_state or st.session_state.price_data is None:
+    st.info("📊 Load stock data first in the Dashboard page.")
+    
+    with st.sidebar:
+        st.header("Quick Load")
+        tickers = st.text_input("Tickers (comma separated):", "AAPL, MSFT")
+        if st.button("Load Sample Data"):
+            try:
+                import yfinance as yf
+                data = yf.download(tickers, period="3mo")
+                if not data.empty:
+                    if 'Close' in data.columns:
+                        if len(tickers.split(',')) > 1:
+                            closes = data['Close']
+                        else:
+                            closes = pd.DataFrame({tickers.strip(): data['Close']})
+                        st.session_state.price_data = closes
+                        st.success("Data loaded!")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
+    
+    st.stop()
+
+price_data = st.session_state.price_data
+
+# Настройка портфеля
+st.sidebar.header("Portfolio Settings")
+
+weights = []
+tickers = price_data.columns.tolist()
+
+st.sidebar.write("**Asset Weights:**")
+for i, ticker in enumerate(tickers):
+    weight = st.sidebar.slider(
+        f"{ticker} Weight", 
+        0, 100, 
+        int(100/len(tickers)), 
+        key=f"weight_{ticker}"
+    )
+    weights.append(weight / 100)
+
+# Нормализуем веса чтобы сумма = 1
+weights = np.array(weights)
+weights = weights / weights.sum()
+
+initial_investment = st.sidebar.number_input(
+    "Initial Investment ($)", 
+    min_value=1000, 
+    max_value=1000000, 
+    value=10000, 
+    step=1000
+)
+
+# Анализ портфеля
+if st.sidebar.button("Analyze Portfolio", type="primary"):
+    analyzer = SimplePortfolioAnalyzer(price_data, weights)
+    
+    # Расчеты
+    portfolio_returns = analyzer.calculate_portfolio_returns()
+    portfolio_value = analyzer.calculate_portfolio_value(initial_investment)
+    
+    # Показать результаты
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_return = (portfolio_value.iloc[-1] / initial_investment - 1) * 100
+        st.metric("Total Return", f"{total_return:.1f}%")
+    
+    with col2:
+        annual_return = ((1 + total_return/100) ** (252/len(portfolio_value)) - 1) * 100
+        st.metric("Annualized Return", f"{annual_return:.1f}%")
+    
+    with col3:
+        volatility = portfolio_returns.std() * np.sqrt(252) * 100
+        st.metric("Portfolio Volatility", f"{volatility:.1f}%")
+    
+    with col4:
+        sharpe = (annual_return / 100) / (volatility / 100) if volatility > 0 else 0
+        st.metric("Sharpe Ratio", f"{sharpe:.2f}")
+    
+    # График стоимости портфеля
+    st.subheader("Portfolio Value Over Time")
+    st.line_chart(portfolio_value)
+    
+    # Распределение активов
+    st.subheader("Portfolio Allocation")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        allocation_df = pd.DataFrame({
+            'Ticker': tickers,
+            'Weight': weights * 100,
+            'Value': weights * initial_investment
+        })
+        st.dataframe(allocation_df.style.format({
+            'Weight': '{:.1f}%',
+            'Value': '${:.0f}'
+        }))
+    
+    with col2:
+        # Круговая диаграмма
+        try:
+            import plotly.express as px
+            fig = px.pie(
+                allocation_df, 
+                values='Weight', 
+                names='Ticker',
+                title='Portfolio Allocation'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        except:
+            st.write("Install plotly for pie chart: pip install plotly")
+
+else:
+    st.info("👆 Configure portfolio weights in the sidebar and click 'Analyze Portfolio'")
+    
+    # Показать текущие данные
+    st.subheader("Available Stocks")
+    st.dataframe(price_data.tail(10).style.format('{:.2f}'))
