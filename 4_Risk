@@ -1,0 +1,365 @@
+# pages/4_Risk.py - исправленная версия
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+
+st.set_page_config(page_title="Risk Analysis", layout="wide")
+st.title("⚠️ Risk Analysis")
+
+# Проверка данных
+if 'price_data' not in st.session_state or st.session_state.price_data is None:
+    st.warning("📊 No stock data loaded!")
+    st.markdown("""
+    Please load stock data in the **Dashboard** page first.
+    
+    **Or run a sample risk analysis:**
+    """)
+    
+    with st.sidebar:
+        st.header("Sample Analysis")
+        if st.button("Run Sample Risk Analysis"):
+            # Создаем демо-данные для анализа рисков
+            dates = pd.date_range('2023-01-01', datetime.now(), freq='D')
+            np.random.seed(42)
+            
+            # Создаем несколько тикеров для диверсификации
+            tickers = ['AAPL', 'MSFT', 'GOOGL']
+            demo_data = pd.DataFrame(index=dates)
+            
+            for ticker in tickers:
+                np.random.seed(hash(ticker) % 1000)
+                prices = 100 + np.cumsum(np.random.randn(len(dates)) * 0.5)
+                demo_data[ticker] = prices
+            
+            st.session_state.price_data = demo_data
+            st.success("Sample data loaded for risk analysis")
+            st.rerun()
+    
+    # Образовательная информация
+    st.markdown("""
+    ## 📚 Risk Metrics Explained
+    
+    ### 1. **Volatility (σ)**
+    - Standard deviation of returns
+    - Measures price fluctuations
+    - Higher volatility = higher risk
+    
+    ### 2. **Value at Risk (VaR)**
+    - Maximum expected loss over a period with given confidence
+    - Example: 95% VaR = worst 5% of outcomes
+    - Calculated using historical or Monte Carlo methods
+    
+    ### 3. **Maximum Drawdown**
+    - Largest peak-to-trough decline
+    - Measures worst historical loss
+    - Important for risk tolerance assessment
+    
+    ### 4. **Sharpe Ratio**
+    - Risk-adjusted return
+    - (Return - Risk-free rate) / Volatility
+    - Higher = better risk-adjusted performance
+    
+    ### 5. **Beta (β)**
+    - Sensitivity to market movements
+    - β = 1: Moves with market
+    - β > 1: More volatile than market
+    - β < 1: Less volatile than market
+    
+    ### 6. **Correlation Matrix**
+    - Shows relationship between assets
+    - Range: -1 to 1
+    - Lower correlation = better diversification
+    """)
+    
+    st.stop()
+
+# Получаем данные
+price_data = st.session_state.price_data
+
+# Сайдбар с настройками
+with st.sidebar:
+    st.header("⚙️ Risk Analysis Settings")
+    
+    # Выбор тикера для детального анализа
+    selected_ticker = st.selectbox(
+        "Select ticker for detailed analysis:",
+        price_data.columns.tolist()
+    )
+    
+    # Параметры анализа
+    st.subheader("Analysis Parameters")
+    
+    confidence_level = st.slider(
+        "VaR Confidence Level:", 
+        90, 99, 95
+    )
+    
+    time_horizon = st.selectbox(
+        "Time Horizon:",
+        ["1 day", "1 week", "1 month", "1 year"],
+        index=0
+    )
+    
+    initial_investment = st.number_input(
+        "Initial Investment ($):",
+        min_value=1000,
+        max_value=1000000,
+        value=10000,
+        step=1000
+    )
+    
+    risk_free_rate = st.slider(
+        "Risk-free Rate (%):",
+        0.0, 5.0, 2.0, 0.1
+    ) / 100
+
+# Основной анализ
+st.success(f"Analyzing risk for {len(price_data.columns)} assets")
+
+# Вкладки
+tab1, tab2, tab3 = st.tabs(["📊 Risk Metrics", "📈 Monte Carlo", "🔄 Stress Tests"])
+
+with tab1:
+    st.subheader("Individual Asset Risk Metrics")
+    
+    for ticker in price_data.columns:
+        with st.expander(f"{ticker} Risk Analysis"):
+            data = price_data[ticker]
+            returns = data.pct_change().dropna()
+            
+            if len(returns) < 10:
+                st.warning("Insufficient data for analysis")
+                continue
+            
+            # Рассчитываем метрики
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                # Годовая волатильность
+                volatility = returns.std() * np.sqrt(252) * 100
+                st.metric("Annual Volatility", f"{volatility:.1f}%")
+            
+            with col2:
+                # Максимальная просадка
+                cumulative = (1 + returns).cumprod()
+                running_max = cumulative.expanding().max()
+                drawdown = (cumulative / running_max - 1) * 100
+                max_dd = drawdown.min()
+                st.metric("Max Drawdown", f"{max_dd:.1f}%")
+            
+            with col3:
+                # VaR (исторический)
+                var_hist = np.percentile(returns, 100 - confidence_level) * 100
+                st.metric(f"{confidence_level}% VaR (Daily)", f"{var_hist:.1f}%")
+            
+            with col4:
+                # Коэффициент Шарпа
+                annual_return = ((data.iloc[-1] / data.iloc[0]) ** (252/len(data)) - 1) * 100
+                sharpe = (annual_return - risk_free_rate * 100) / volatility if volatility > 0 else 0
+                st.metric("Sharpe Ratio", f"{sharpe:.2f}")
+            
+            # Дополнительные метрики
+            col5, col6 = st.columns(2)
+            
+            with col5:
+                # Beta (упрощенный)
+                if len(price_data.columns) > 1:
+                    # Используем первый тикер как бенчмарк
+                    benchmark_returns = price_data[price_data.columns[0]].pct_change().dropna()
+                    aligned_returns = pd.concat([returns, benchmark_returns], axis=1).dropna()
+                    if len(aligned_returns) > 10:
+                        covariance = aligned_returns.iloc[:, 0].cov(aligned_returns.iloc[:, 1])
+                        variance = aligned_returns.iloc[:, 1].var()
+                        beta = covariance / variance if variance > 0 else 1
+                        st.metric("Beta (vs Market)", f"{beta:.2f}")
+            
+            with col6:
+                # Сортино (упрощенный)
+                negative_returns = returns[returns < 0]
+                downside_dev = negative_returns.std() * np.sqrt(252) * 100 if len(negative_returns) > 0 else volatility
+                sortino = (annual_return - risk_free_rate * 100) / downside_dev if downside_dev > 0 else 0
+                st.metric("Sortino Ratio", f"{sortino:.2f}")
+    
+    st.subheader("Portfolio Diversification")
+    
+    if len(price_data.columns) > 1:
+        # Матрица корреляций
+        returns_all = price_data.pct_change().dropna()
+        correlation_matrix = returns_all.corr()
+        
+        st.write("**Correlation Matrix**")
+        st.dataframe(correlation_matrix.style.format('{:.2f}').background_gradient(cmap='RdYlBu', vmin=-1, vmax=1))
+        
+        # Диверсификация
+        avg_correlation = correlation_matrix.values[np.triu_indices_from(correlation_matrix.values, k=1)].mean()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Average Correlation", f"{avg_correlation:.2f}")
+        with col2:
+            diversification_score = max(0, 1 - avg_correlation) * 100
+            st.metric("Diversification Score", f"{diversification_score:.0f}%")
+
+with tab2:
+    st.subheader("Monte Carlo Simulation")
+    
+    if selected_ticker:
+        data = price_data[selected_ticker]
+        returns = data.pct_change().dropna()
+        
+        if len(returns) > 20:
+            # Параметры симуляции
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                n_simulations = st.slider("Simulations", 100, 5000, 1000, key="mc_sim")
+            with col2:
+                n_days = st.slider("Forecast Days", 30, 365, 90, key="mc_days")
+            with col3:
+                mc_initial = st.number_input("Initial Value", value=float(data.iloc[-1]), key="mc_init")
+            
+            if st.button("Run Monte Carlo Simulation", type="primary"):
+                with st.spinner("Running simulations..."):
+                    # Параметры распределения
+                    mu = returns.mean()
+                    sigma = returns.std()
+                    
+                    # Генерируем симуляции
+                    simulations = np.zeros((n_days, n_simulations))
+                    simulations[0] = mc_initial
+                    
+                    np.random.seed(42)  # Для воспроизводимости
+                    for day in range(1, n_days):
+                        shocks = np.random.normal(mu, sigma, n_simulations)
+                        simulations[day] = simulations[day-1] * (1 + shocks)
+                    
+                    # Анализ результатов
+                    final_prices = simulations[-1]
+                    
+                    st.success(f"Completed {n_simulations:,} simulations")
+                    
+                    # Статистика
+                    stats_cols = st.columns(4)
+                    with stats_cols[0]:
+                        avg_final = final_prices.mean()
+                        st.metric("Average Final Price", f"{avg_final:.2f}")
+                    with stats_cols[1]:
+                        median_final = np.median(final_prices)
+                        st.metric("Median Final Price", f"{median_final:.2f}")
+                    with stats_cols[2]:
+                        worst_5 = np.percentile(final_prices, 5)
+                        st.metric("5% Worst Case", f"{worst_5:.2f}")
+                    with stats_cols[3]:
+                        best_5 = np.percentile(final_prices, 95)
+                        st.metric("5% Best Case", f"{best_5:.2f}")
+                    
+                    # Визуализация
+                    st.subheader("Simulation Results")
+                    
+                    # 50 случайных симуляций для графика
+                    sample_idx = np.random.choice(n_simulations, min(50, n_simulations), replace=False)
+                    sample_simulations = simulations[:, sample_idx]
+                    
+                    # Создаем DataFrame для графика
+                    sim_df = pd.DataFrame(sample_simulations, 
+                                         index=range(n_days),
+                                         columns=[f"Sim {i+1}" for i in range(len(sample_idx))])
+                    
+                    st.line_chart(sim_df)
+                    
+                    # Гистограмма конечных цен
+                    st.subheader("Final Price Distribution")
+                    hist_values, hist_bins = np.histogram(final_prices, bins=50)
+                    hist_df = pd.DataFrame({
+                        'Price Range': [f"{hist_bins[i]:.0f}-{hist_bins[i+1]:.0f}" for i in range(len(hist_bins)-1)],
+                        'Count': hist_values
+                    })
+                    st.bar_chart(hist_df.set_index('Price Range'))
+
+with tab3:
+    st.subheader("Stress Testing")
+    
+    st.info("""
+    ### Scenario Analysis
+    
+    Test how your portfolio performs under different market conditions.
+    Each scenario applies a market shock and shows the impact on your assets.
+    """)
+    
+    # Определяем сценарии
+    scenarios = {
+        "🚨 Market Crash": {
+            "description": "Global financial crisis (-40% market)",
+            "shock": -0.40
+        },
+        "📉 Bear Market": {
+            "description": "Sustained market decline (-20%)",
+            "shock": -0.20
+        },
+        "🌧️ Recession": {
+            "description": "Economic recession (-10%)",
+            "shock": -0.10
+        },
+        "🌤️ Normal Market": {
+            "description": "Typical market conditions (0%)",
+            "shock": 0.00
+        },
+        "📈 Bull Market": {
+            "description": "Strong market growth (+20%)",
+            "shock": 0.20
+        },
+        "🚀 Market Boom": {
+            "description": "Extraordinary growth (+40%)",
+            "shock": 0.40
+        }
+    }
+    
+    for scenario_name, scenario_data in scenarios.items():
+        with st.expander(f"{scenario_name}"):
+            st.write(f"**{scenario_data['description']}**")
+            
+            shock = scenario_data['shock']
+            results = []
+            
+            for ticker in price_data.columns:
+                current_price = price_data[ticker].iloc[-1]
+                new_price = current_price * (1 + shock)
+                change_pct = shock * 100
+                
+                # Расчет потерь/прибыли
+                position_value = current_price * 100  # Предполагаем 100 акций
+                new_position_value = new_price * 100
+                pnl = new_position_value - position_value
+                
+                results.append({
+                    'Asset': ticker,
+                    'Current Price': current_price,
+                    'New Price': new_price,
+                    'Change %': change_pct,
+                    'Position P&L': pnl
+                })
+            
+            results_df = pd.DataFrame(results)
+            
+            # Отображаем таблицу
+            st.dataframe(results_df.style.format({
+                'Current Price': '{:.2f}',
+                'New Price': '{:.2f}',
+                'Change %': '{:.1f}%',
+                'Position P&L': '${:,.0f}'
+            }))
+            
+            # Сводная статистика
+            if len(results) > 0:
+                total_pnl = results_df['Position P&L'].sum()
+                avg_change = results_df['Change %'].mean()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total Portfolio P&L", f"${total_pnl:,.0f}")
+                with col2:
+                    st.metric("Average Asset Change", f"{avg_change:.1f}%")
+
+# Футер
+st.markdown("---")
+st.caption(f"Risk Analysis • {len(price_data.columns)} assets • Confidence Level: {confidence_level}% • Last update: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
