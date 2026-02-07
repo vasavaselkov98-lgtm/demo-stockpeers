@@ -1,0 +1,183 @@
+# pages/2_Technical.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import plotly.graph_objects as go
+import plotly.express as px
+import warnings
+
+warnings.filterwarnings("ignore")
+
+# ==================== SESSION INIT ====================
+
+if "global_data" not in st.session_state:
+    st.session_state.global_data = {
+        "price_data": None,
+        "tickers": [],
+        "market_type": "Stocks",
+        "data_loaded": False,
+        "source_page": None,
+    }
+
+def get_global_data():
+    return st.session_state.global_data
+
+def is_data_loaded():
+    return st.session_state.global_data["data_loaded"]
+
+st.set_page_config(
+    page_title="Technical Analysis",
+    page_icon="📈",
+    layout="wide",
+)
+
+st.title("📈 Technical Analysis")
+
+# ==================== DATA RESOLUTION ====================
+
+USE_GLOBAL_DATA = False
+
+if is_data_loaded():
+    global_data = get_global_data()
+    if global_data["price_data"] is not None and global_data["tickers"]:
+        price_data = global_data["price_data"]
+        tickers = global_data["tickers"]
+        market_type = global_data["market_type"]
+        USE_GLOBAL_DATA = True
+    else:
+        price_data = None
+        tickers = []
+        market_type = "Stocks"
+else:
+    price_data = st.session_state.get("price_data")
+    if price_data is not None:
+        tickers = list(price_data.columns)
+        market_type = "Local Data"
+    else:
+        st.warning("📊 No data loaded. Go to Dashboard.")
+        st.stop()
+
+# ==================== 🔧 FIXED VARIABLES ====================
+
+available_tickers = tickers
+current_market_type = market_type
+
+# ==================== SIDEBAR ====================
+
+with st.sidebar:
+    st.header("⚙️ Analysis Settings")
+
+    if USE_GLOBAL_DATA:
+        st.success(f"🌐 Global: {len(available_tickers)} tickers")
+    else:
+        st.info(f"📊 Local: {len(available_tickers)} ticker(s)")
+
+    selected_ticker = st.selectbox(
+        "Select ticker:",
+        available_tickers,
+        index=0,
+    )
+
+    st.markdown("---")
+
+    show_sma = st.checkbox("SMA", True)
+    show_rsi = st.checkbox("RSI", True)
+    show_volume = st.checkbox("Volume", False)
+
+    if show_sma:
+        sma_periods = st.multiselect(
+            "SMA Periods",
+            [5, 10, 20, 50, 100, 200],
+            default=[20, 50],
+        )
+
+    if show_rsi:
+        rsi_period = st.slider("RSI Period", 5, 30, 14)
+        rsi_overbought = st.slider("Overbought", 70, 90, 70)
+        rsi_oversold = st.slider("Oversold", 10, 30, 30)
+
+# ==================== DATA SELECTION ====================
+
+if isinstance(price_data, pd.DataFrame):
+    data_series = price_data[selected_ticker]
+else:
+    data_series = price_data
+
+st.success(
+    f"Analyzing **{selected_ticker}** | "
+    f"{'🌐 Global' if USE_GLOBAL_DATA else '📊 Local'} | "
+    f"{len(data_series)} data points"
+)
+
+# ==================== SIMPLE INDICATORS ====================
+
+def calculate_sma(series, period):
+    return series.rolling(period).mean()
+
+def calculate_rsi(series, period):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    rs = gain.rolling(period).mean() / loss.rolling(period).mean()
+    return 100 - (100 / (1 + rs))
+
+# ==================== CHART ====================
+
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(
+    x=data_series.index,
+    y=data_series,
+    name="Price",
+    line=dict(width=2),
+))
+
+if show_sma:
+    for p in sma_periods:
+        fig.add_trace(go.Scatter(
+            x=data_series.index,
+            y=calculate_sma(data_series, p),
+            name=f"SMA {p}",
+            line=dict(dash="dot"),
+        ))
+
+fig.update_layout(
+    height=700,
+    title=f"{selected_ticker} Price Chart",
+    xaxis_title="Date",
+    yaxis_title="Price",
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# ==================== RSI ====================
+
+if show_rsi:
+    rsi = calculate_rsi(data_series, rsi_period)
+
+    fig_rsi = go.Figure()
+    fig_rsi.add_trace(go.Scatter(
+        x=rsi.index,
+        y=rsi,
+        name="RSI",
+    ))
+    fig_rsi.add_hline(y=rsi_overbought, line_dash="dash", line_color="red")
+    fig_rsi.add_hline(y=rsi_oversold, line_dash="dash", line_color="green")
+
+    fig_rsi.update_layout(
+        height=300,
+        title="RSI",
+        yaxis_range=[0, 100],
+    )
+
+    st.plotly_chart(fig_rsi, use_container_width=True)
+
+# ==================== FOOTER ====================
+
+st.markdown("---")
+st.caption(
+    f"{'🌐 Global' if USE_GLOBAL_DATA else '📊 Local'} • "
+    f"{selected_ticker} • "
+    f"{datetime.now().strftime('%Y-%m-%d %H:%M')}"
+)
