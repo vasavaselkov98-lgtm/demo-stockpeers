@@ -1,0 +1,1093 @@
+# pages/1_Dashboard.py - Обновленная версия с глобальным состоянием
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import warnings
+import sys
+import os
+
+warnings.filterwarnings('ignore')
+
+# ==================== ИМПОРТ ГЛОБАЛЬНЫХ ФУНКЦИЙ ====================
+
+# Добавляем родительскую директорию в путь для импорта
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
+# Пробуем импортировать функции из app.py
+try:
+    from app import update_global_state, get_global_data, is_data_loaded, clear_global_state
+    GLOBAL_STATE_AVAILABLE = True
+except ImportError:
+    GLOBAL_STATE_AVAILABLE = False
+    print("⚠️ Global state functions not available - running in standalone mode")
+    
+    # Fallback функции если импорт не удался
+    def update_global_state(price_data, tickers, market_type, period, interval, source_page="Dashboard"):
+        """Fallback функция"""
+        st.session_state.global_data = {
+            'price_data': price_data,
+            'tickers': tickers,
+            'market_type': market_type,
+            'period': period,
+            'interval': interval,
+            'data_loaded': True,
+            'last_updated': datetime.now(),
+            'source_page': source_page
+        }
+        st.session_state.price_data = price_data
+        st.session_state.market_data = price_data
+        st.session_state.selected_tickers = tickers
+    
+    def get_global_data():
+        return st.session_state.get('global_data', {})
+    
+    def is_data_loaded():
+        return st.session_state.get('global_data', {}).get('data_loaded', False)
+    
+    def clear_global_state():
+        if 'global_data' in st.session_state:
+            st.session_state.global_data['data_loaded'] = False
+            st.session_state.global_data['price_data'] = None
+            st.session_state.global_data['tickers'] = []
+
+st.set_page_config(
+    page_title="Market Dashboard",
+    page_icon="📊",
+    layout="wide"
+)
+
+# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
+def create_single_chart(data, ticker, chart_type, show_volume, height, show_grid, show_sma=False, show_rsi=False):
+    """Create a detailed single chart"""
+    
+    # Определяем количество строк для субплотов
+    rows = 1
+    row_heights = [1.0]
+    
+    if show_volume:
+        rows += 1
+        row_heights = [0.7, 0.3]
+    
+    if show_rsi:
+        rows += 1
+        row_heights = [0.6, 0.2, 0.2] if show_volume else [0.7, 0.3]
+    
+    # Создаем субплотовый график
+    fig = make_subplots(
+        rows=rows, 
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.05,
+        row_heights=row_heights,
+        subplot_titles=[f"{ticker} - Price Chart"] + 
+                       ["Volume"] * (1 if show_volume else 0) + 
+                       ["RSI"] * (1 if show_rsi else 0)
+    )
+    
+    # Основной ценовой график
+    row_idx = 1
+    
+    if chart_type == "Candlestick":
+        fig.add_trace(
+            go.Candlestick(
+                x=data.index,
+                open=data['Open'] if 'Open' in data.columns else data.iloc[:, 0],
+                high=data['High'] if 'High' in data.columns else data.iloc[:, 1],
+                low=data['Low'] if 'Low' in data.columns else data.iloc[:, 2],
+                close=data['Close'] if 'Close' in data.columns else data.iloc[:, 3],
+                name="Price",
+                showlegend=False
+            ),
+            row=row_idx, col=1
+        )
+    else:
+        # Line chart
+        close_data = data['Close'] if 'Close' in data.columns else data.iloc[:, 3]
+        fig.add_trace(
+            go.Scatter(
+                x=close_data.index,
+                y=close_data,
+                name="Price",
+                line=dict(color='#1f77b4', width=2),
+                showlegend=False,
+                mode='lines'
+            ),
+            row=row_idx, col=1
+        )
+    
+    # Добавляем SMA если нужно
+    if show_sma and 'Close' in data.columns:
+        sma_data = data['Close'].rolling(window=20).mean()
+        fig.add_trace(
+            go.Scatter(
+                x=sma_data.index,
+                y=sma_data,
+                name="SMA 20",
+                line=dict(color='orange', width=1, dash='dash'),
+                opacity=0.7,
+                showlegend=True
+            ),
+            row=row_idx, col=1
+        )
+    
+    # Добавляем объем
+    if show_volume and 'Volume' in data.columns:
+        volume_row = row_idx + 1
+        colors = ['red' if data['Close'].iloc[i] < data['Open'].iloc[i] 
+                 else 'green' for i in range(len(data))]
+        
+        fig.add_trace(
+            go.Bar(
+                x=data.index,
+                y=data['Volume'],
+                name="Volume",
+                marker_color=colors,
+                showlegend=False
+            ),
+            row=volume_row, col=1
+        )
+    
+    # Добавляем RSI если нужно
+    if show_rsi and 'Close' in data.columns:
+        rsi_row = rows  # Последний ряд
+        
+        # Calculate RSI
+        delta = data['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        fig.add_trace(
+            go.Scatter(
+                x=rsi.index,
+                y=rsi,
+                name="RSI",
+                line=dict(color='purple', width=1),
+                showlegend=False
+            ),
+            row=rsi_row, col=1
+        )
+        
+        # Add RSI levels
+        fig.add_hline(y=70, line_dash="dash", line_color="red", opacity=0.5, row=rsi_row, col=1)
+        fig.add_hline(y=30, line_dash="dash", line_color="green", opacity=0.5, row=rsi_row, col=1)
+    
+    # Настройки layout
+    fig.update_layout(
+        title=f"{ticker} - Detailed Analysis",
+        height=height,
+        showlegend=True,
+        hovermode='x unified',
+        template="plotly_white",
+        xaxis_rangeslider_visible=False
+    )
+    
+    # Настройки сетки
+    if show_grid:
+        for i in range(1, rows + 1):
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', row=i, col=1)
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', row=i, col=1)
+    
+    # Display the chart
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Quick metrics below chart
+    if 'Close' in data.columns:
+        current_price = data['Close'].iloc[-1]
+        prev_price = data['Close'].iloc[-2] if len(data) > 1 else current_price
+        change_pct = ((current_price - prev_price) / prev_price * 100) if prev_price != 0 else 0
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Current Price", f"${current_price:.2f}", f"{change_pct:.2f}%")
+        with col2:
+            st.metric("High", f"${data['High'].max():.2f}")
+        with col3:
+            st.metric("Low", f"${data['Low'].min():.2f}")
+        with col4:
+            st.metric("Avg Volume", f"{data['Volume'].mean():,.0f}")
+
+def create_mini_chart(data, ticker, chart_type):
+    """Create a mini chart for grid/side-by-side display"""
+    
+    fig = go.Figure()
+    
+    if chart_type == "Candlestick" and all(col in data.columns for col in ['Open', 'High', 'Low', 'Close']):
+        fig.add_trace(go.Candlestick(
+            x=data.index,
+            open=data['Open'],
+            high=data['High'],
+            low=data['Low'],
+            close=data['Close'],
+            name=ticker,
+            showlegend=False
+        ))
+    else:
+        # Line chart
+        close_data = data['Close'] if 'Close' in data.columns else data.iloc[:, 3]
+        fig.add_trace(go.Scatter(
+            x=close_data.index,
+            y=close_data,
+            mode='lines',
+            name=ticker,
+            line=dict(color='blue', width=1),
+            showlegend=False
+        ))
+    
+    # Calculate metrics for mini info
+    if 'Close' in data.columns:
+        current_price = data['Close'].iloc[-1]
+        prev_price = data['Close'].iloc[-2] if len(data) > 1 else current_price
+        change_pct = ((current_price - prev_price) / prev_price * 100) if prev_price != 0 else 0
+        
+        # Mini title with metrics
+        fig.update_layout(
+            title=f"{ticker}<br>${current_price:.2f} <span style='color: {'green' if change_pct >= 0 else 'red'}'>({change_pct:+.1f}%)</span>",
+            height=250,
+            margin=dict(t=50, b=20, l=20, r=20),
+            xaxis_rangeslider_visible=False,
+            showlegend=False,
+            template="plotly_white"
+        )
+    
+    # Remove axis labels for cleaner look
+    fig.update_xaxes(showticklabels=False, title="")
+    fig.update_yaxes(showticklabels=False, title="")
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+# Заголовок с информацией о глобальном состоянии
+st.markdown("""
+<h1 style='text-align: center; color: #1f77b4; margin-bottom: 0.5rem;'>
+📊 Market Dashboard
+</h1>
+<p style='text-align: center; color: #666; margin-bottom: 2rem;'>
+Real-time market analysis with global data synchronization
+</p>
+""", unsafe_allow_html=True)
+
+# ==================== ПАНЕЛЬ ГЛОБАЛЬНОГО СОСТОЯНИЯ ====================
+
+# Проверяем есть ли глобальные данные
+if GLOBAL_STATE_AVAILABLE and is_data_loaded():
+    global_data = get_global_data()
+    
+    # Показываем статус глобальных данных
+    st.markdown(f"""
+    <div style='background-color: #e8f4fd; padding: 1rem; border-radius: 10px; border-left: 4px solid #1f77b4; margin-bottom: 1rem;'>
+        <div style='display: flex; justify-content: space-between; align-items: center;'>
+            <div>
+                <strong style='color: #1f77b4;'>🌐 Global Data Active</strong>
+                <div style='color: #666; font-size: 0.9rem;'>
+                    {len(global_data['tickers'])} tickers from {global_data['market_type']} market
+                </div>
+            </div>
+            <div>
+                <span style='font-size: 0.8rem; color: #666;'>
+                    Last updated: {global_data.get('last_updated', datetime.now()).strftime('%H:%M')}
+                </span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Кнопки для работы с глобальными данными
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🔄 Use Current Data", use_container_width=True):
+            # Используем текущие глобальные данные
+            st.session_state.market_data = global_data['price_data']
+            st.session_state.data_loaded = True
+            st.session_state.price_data = global_data['price_data']
+            st.session_state.selected_tickers = global_data['tickers']
+            st.rerun()
+    with col2:
+        if st.button("📈 Analyze in Technical", use_container_width=True):
+            st.switch_page("pages/2_Technical.py")
+    with col3:
+        if st.button("⚠️ Analyze Risk", use_container_width=True):
+            st.switch_page("pages/4_Risk.py")
+
+# ==================== САЙДБАР С ВЫБОРОМ РЫНКА ====================
+with st.sidebar:
+    st.header("🎯 Market Selection")
+    
+    # Информация о глобальных данных
+    if GLOBAL_STATE_AVAILABLE and is_data_loaded():
+        global_data = get_global_data()
+        st.success(f"Global: {len(global_data['tickers'])} tickers")
+        if st.button("🧹 Clear Global Data", type="secondary", use_container_width=True):
+            clear_global_state()
+            st.rerun()
+        st.markdown("---")
+    
+    # Выбор типа рынка
+    market_type = st.selectbox(
+        "Market Type:",
+        ["Stocks", "Cryptocurrency", "Forex", "Commodities", "Indices", "ETFs", "Futures"],
+        index=0
+    )
+    
+    # Предустановленные тикеры по рынкам
+    market_presets = {
+        "Stocks": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA"],
+        "Cryptocurrency": ["BTC-USD", "ETH-USD", "SOL-USD", "ADA-USD", "DOGE-USD"],
+        "Forex": ["EURUSD=X", "GBPUSD=X", "JPYUSD=X", "AUDUSD=X", "CADUSD=X"],
+        "Commodities": ["GC=F", "SI=F", "CL=F", "NG=F", "ZC=F"],
+        "Indices": ["^GSPC", "^IXIC", "^DJI", "^RUT", "^FTSE"],
+        "ETFs": ["SPY", "QQQ", "VTI", "GLD", "TLT"],
+        "Futures": ["ES=F", "NQ=F", "YM=F", "RTY=F", "GC=F"]
+    }
+    
+    # Мультивыбор тикеров
+    selected_tickers = st.multiselect(
+        f"Select {market_type}:",
+        options=market_presets[market_type],
+        default=market_presets[market_type][:3]
+    )
+    
+    # Пользовательский ввод
+    custom_tickers = st.text_input(
+        "Or enter custom symbols (comma separated):",
+        placeholder="e.g., AAPL, MSFT, GOOGL"
+    )
+    
+    if custom_tickers:
+        custom_list = [t.strip().upper() for t in custom_tickers.split(',') if t.strip()]
+        selected_tickers = custom_list
+    
+    st.markdown("---")
+    
+    # Настройки данных
+    st.header("⚙️ Data Settings")
+    
+    # Период
+    period_options = {
+        "1 Day": "1d",
+        "1 Week": "5d", 
+        "1 Month": "1mo",
+        "3 Months": "3mo",
+        "6 Months": "6mo",
+        "1 Year": "1y",
+        "2 Years": "2y",
+        "5 Years": "5y",
+        "10 Years": "10y"
+    }
+    
+    selected_period = st.selectbox(
+        "Time Period:",
+        list(period_options.keys()),
+        index=5  # 1 Year по умолчанию
+    )
+    
+    # Интервал
+    interval_options = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo"]
+    selected_interval = st.selectbox(
+        "Interval:",
+        interval_options,
+        index=8  # 1d по умолчанию
+    )
+    
+    st.markdown("---")
+    
+    # Настройки отображения
+    st.header("🎨 Display Settings")
+    
+    show_volume = st.checkbox("Show Volume", value=True)
+    show_grid = st.checkbox("Show Grid", value=True)
+    show_indicators = st.checkbox("Show Technical Indicators", value=False)
+    
+    chart_type = st.selectbox(
+        "Chart Type:",
+        ["Candlestick", "Line", "OHLC", "Area"],
+        index=0
+    )
+    
+    chart_height = st.slider("Chart Height", 400, 1000, 600)
+    
+    # Technical indicators
+    if show_indicators:
+        st.markdown("**Technical Indicators:**")
+        show_sma = st.checkbox("SMA (Simple Moving Average)", value=True)
+        if show_sma:
+            sma_period = st.slider("SMA Period", 5, 100, 20)
+        show_rsi = st.checkbox("RSI (Relative Strength Index)", value=False)
+        if show_rsi:
+            rsi_period = st.slider("RSI Period", 5, 30, 14)
+    
+    st.markdown("---")
+    
+    # Кнопки действий
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        load_btn = st.button("📥 Load Data", type="primary", width='stretch')
+    with col2:
+        if st.button("🔄 Reset", width='stretch'):
+            st.rerun()
+    with col3:
+        if GLOBAL_STATE_AVAILABLE and st.button("🌐 Sync", width='stretch'):
+            st.info("Data will sync globally after loading")
+    
+    st.caption(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+# Инициализация session state
+if 'market_data' not in st.session_state:
+    st.session_state.market_data = None
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
+
+# Функции для загрузки данных и расчета индикаторов
+def load_market_data(tickers, period, interval):
+    """Load market data with fallback"""
+    try:
+        import yfinance as yf
+        
+        # Загружаем данные
+        data = yf.download(
+            tickers,
+            period=period,
+            interval=interval,
+            group_by='ticker',
+            progress=False
+        )
+        
+        return data
+        
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
+
+def create_demo_data(tickers, days=252):
+    """Create demo data for testing"""
+    dates = pd.date_range(end=datetime.now(), periods=days, freq='B')
+    demo_data = {}
+    
+    for ticker in tickers:
+        np.random.seed(hash(ticker) % 1000)
+        
+        # Generate price series with some randomness
+        returns = np.random.normal(0.0005, 0.02, days)
+        prices = 100 * np.cumprod(1 + returns)
+        
+        # Add some trend based on ticker
+        if 'AAPL' in ticker:
+            prices = prices * (1 + np.linspace(0, 0.3, days))
+        elif 'MSFT' in ticker:
+            prices = prices * (1 + np.linspace(0, 0.2, days))
+        elif 'GOOGL' in ticker:
+            prices = prices * (1 + np.linspace(0, 0.15, days))
+        
+        # Create OHLC data
+        df = pd.DataFrame({
+            'Open': prices * 0.99,
+            'High': prices * 1.01,
+            'Low': prices * 0.98,
+            'Close': prices,
+            'Volume': np.random.randint(1000000, 10000000, days)
+        }, index=dates)
+        
+        demo_data[ticker] = df
+    
+    # Create multi-index dataframe similar to yfinance
+    if len(tickers) > 1:
+        combined = pd.concat(demo_data, axis=1)
+        combined.columns = pd.MultiIndex.from_tuples(
+            [(ticker, col) for ticker in demo_data.keys() for col in ['Open', 'High', 'Low', 'Close', 'Volume']],
+            names=['Ticker', 'Price']
+        )
+        return combined
+    else:
+        return list(demo_data.values())[0]
+
+def calculate_indicators(data, show_sma=False, sma_period=20, show_rsi=False, rsi_period=14):
+    """Calculate technical indicators"""
+    indicators = {}
+    
+    if isinstance(data, pd.DataFrame) and 'Close' in data.columns:
+        if show_sma:
+            indicators['SMA'] = data['Close'].rolling(window=sma_period).mean()
+        
+        if show_rsi:
+            # Calculate RSI
+            delta = data['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
+            rs = gain / loss
+            indicators['RSI'] = 100 - (100 / (1 + rs))
+    
+    return indicators
+
+# ==================== ЗАГРУЗКА ДАННЫХ ====================
+if load_btn and selected_tickers:
+    with st.spinner(f"Loading {len(selected_tickers)} {market_type.lower()}..."):
+        try:
+            # Попробовать загрузить реальные данные
+            data = load_market_data(selected_tickers, period_options[selected_period], selected_interval)
+            
+            if data is None or data.empty:
+                st.warning("Using demo data. Real data unavailable.")
+                data = create_demo_data(selected_tickers, 252)
+            
+            st.session_state.market_data = data
+            st.session_state.data_loaded = True
+            st.success(f"✅ Data loaded successfully!")
+            
+            # ==================== СОХРАНЕНИЕ В ГЛОБАЛЬНОЕ СОСТОЯНИЕ ====================
+            if GLOBAL_STATE_AVAILABLE:
+                update_global_state(
+                    price_data=data,
+                    tickers=selected_tickers,
+                    market_type=market_type,
+                    period=period_options[selected_period],
+                    interval=selected_interval,
+                    source_page="Dashboard"
+                )
+                
+                st.info(f"🌐 Data synchronized globally - available in all modules")
+                
+                # Показать быстрые ссылки на другие модули
+                st.markdown("---")
+                st.markdown("### 🚀 Quick Analysis")
+                
+                cols = st.columns(4)
+                with cols[0]:
+                    if st.button("🔧 Technical", use_container_width=True):
+                        st.switch_page("pages/2_Technical.py")
+                with cols[1]:
+                    if st.button("⚖️ Portfolio", use_container_width=True):
+                        st.switch_page("pages/3_Portfolio.py")
+                with cols[2]:
+                    if st.button("⚠️ Risk", use_container_width=True):
+                        st.switch_page("pages/4_Risk.py")
+                with cols[3]:
+                    if st.button("📊 Back to Main", use_container_width=True):
+                        st.switch_page("app.py")
+            
+        except Exception as e:
+            st.error(f"Error: {e}")
+            data = create_demo_data(selected_tickers, 252)
+            st.session_state.market_data = data
+            st.session_state.data_loaded = True
+            st.info("📊 Demo data loaded for analysis")
+
+# ==================== ГЛАВНАЯ ПАНЕЛЬ ====================
+if st.session_state.data_loaded and st.session_state.market_data is not None:
+    data = st.session_state.market_data
+    
+    # Показать информацию о глобальной синхронизации
+    if GLOBAL_STATE_AVAILABLE and is_data_loaded():
+        st.markdown(f"""
+        <div style='background-color: #f0f9ff; padding: 0.5rem 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #b3d9ff;'>
+            <div style='display: flex; align-items: center; gap: 10px;'>
+                <span style='color: #0066cc;'>🌐</span>
+                <span style='font-size: 0.9rem; color: #0066cc;'>
+                    <strong>Global Sync Active</strong> - Data available in Technical, Portfolio, and Risk modules
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Вкладки панели
+    tab1, tab2, tab3, tab4 = st.tabs(["📈 Individual Charts", "📊 Comparison View", "🔍 Analysis", "📋 Data"])
+    
+    # ==================== ВКЛАДКА 1: ОТДЕЛЬНЫЕ ГРАФИКИ ====================
+    with tab1:
+        st.subheader("Individual Price Charts")
+        
+        if selected_tickers:
+            # Выбор режима отображения
+            col_mode, col_info = st.columns([2, 1])
+            with col_mode:
+                display_mode = st.radio(
+                    "Display Mode:",
+                    ["One Chart", "Side by Side", "Grid View"],
+                    horizontal=True,
+                    index=2
+                )
+            
+            with col_info:
+                st.caption(f"Showing {len(selected_tickers)} instruments")
+            
+            # Получение настроек индикаторов из сайдбара
+            show_sma = st.sidebar.checkbox("SMA", value=True) if 'show_sma' in locals() else False
+            show_rsi = st.sidebar.checkbox("RSI", value=False) if 'show_rsi' in locals() else False
+            
+            # Режим "One Chart" - выбор тикера для отображения
+            if display_mode == "One Chart":
+                selected_ticker = st.selectbox(
+                    "Select instrument to display:",
+                    selected_tickers,
+                    index=0
+                )
+                
+                # Подготовка данных для выбранного тикера
+                if len(selected_tickers) == 1:
+                    chart_data = data
+                else:
+                    if selected_ticker in data.columns.levels[0]:
+                        chart_data = data[selected_ticker]
+                    else:
+                        chart_data = data
+                
+                # Создание графика
+                create_single_chart(chart_data, selected_ticker, chart_type, show_volume, 
+                                  chart_height, show_grid, show_sma, show_rsi)
+            
+            # Режим "Side by Side" - графики рядом
+            elif display_mode == "Side by Side":
+                if len(selected_tickers) <= 4:
+                    cols = st.columns(len(selected_tickers))
+                    for idx, ticker in enumerate(selected_tickers):
+                        with cols[idx]:
+                            # Подготовка данных
+                            if len(selected_tickers) == 1:
+                                chart_data = data
+                            else:
+                                if ticker in data.columns.levels[0]:
+                                    chart_data = data[ticker]
+                                else:
+                                    continue
+                            
+                            # Создание мини-графика
+                            create_mini_chart(chart_data, ticker, chart_type)
+                else:
+                    st.warning("For more than 4 instruments, use Grid View")
+                    display_mode = "Grid View"
+            
+            # Режим "Grid View" - сетка графиков
+            if display_mode == "Grid View":
+                # Определяем размер сетки
+                if len(selected_tickers) <= 4:
+                    n_cols = 2
+                elif len(selected_tickers) <= 6:
+                    n_cols = 3
+                else:
+                    n_cols = 4
+                
+                n_rows = (len(selected_tickers) + n_cols - 1) // n_cols
+                
+                # Создаем сетку
+                for row in range(n_rows):
+                    cols = st.columns(n_cols)
+                    for col in range(n_cols):
+                        idx = row * n_cols + col
+                        if idx < len(selected_tickers):
+                            ticker = selected_tickers[idx]
+                            with cols[col]:
+                                # Подготовка данных
+                                if len(selected_tickers) == 1:
+                                    chart_data = data
+                                else:
+                                    if ticker in data.columns.levels[0]:
+                                        chart_data = data[ticker]
+                                    else:
+                                        continue
+                                
+                                # Создание мини-графика
+                                create_mini_chart(chart_data, ticker, chart_type)
+    
+    # ==================== ВКЛАДКА 2: СРАВНИТЕЛЬНЫЙ ВИД ====================
+    with tab2:
+        st.subheader("Comparison View")
+        
+        if len(selected_tickers) > 1:
+            # График сравнения (все на одном графике)
+            st.markdown("**All Instruments on One Chart**")
+            
+            comparison_data = pd.DataFrame()
+            for ticker in selected_tickers:
+                if ticker in data.columns.levels[0]:
+                    close_prices = data[ticker]['Close']
+                    # Normalize to 100 for comparison
+                    normalized = (close_prices / close_prices.iloc[0] * 100)
+                    comparison_data[ticker] = normalized
+            
+            if not comparison_data.empty:
+                fig = go.Figure()
+                
+                colors = px.colors.qualitative.Set3
+                for idx, column in enumerate(comparison_data.columns):
+                    fig.add_trace(go.Scatter(
+                        x=comparison_data.index,
+                        y=comparison_data[column],
+                        name=column,
+                        mode='lines',
+                        line=dict(color=colors[idx % len(colors)], width=2),
+                        hovertemplate=f"{column}<br>Date: %{{x}}<br>Return: %{{y:.1f}}%<extra></extra>"
+                    ))
+                
+                fig.update_layout(
+                    title="Normalized Performance Comparison (100 = Starting Price)",
+                    height=chart_height,
+                    xaxis_title="Date",
+                    yaxis_title="Normalized Price (%)",
+                    hovermode='x unified',
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
+                )
+                
+                if show_grid:
+                    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Матрица графиков 2x2 для быстрого сравнения
+            st.markdown("**Quick Comparison Grid**")
+            
+            # Выбираем до 4 тикеров для матрицы
+            if len(selected_tickers) > 4:
+                matrix_tickers = selected_tickers[:4]
+                st.caption(f"Showing first 4 of {len(selected_tickers)} instruments")
+            else:
+                matrix_tickers = selected_tickers
+            
+            # Создаем субплотовую матрицу
+            fig = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=matrix_tickers,
+                shared_xaxes=True,
+                vertical_spacing=0.1,
+                horizontal_spacing=0.1
+            )
+            
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+            
+            for idx, ticker in enumerate(matrix_tickers):
+                row = idx // 2 + 1
+                col = idx % 2 + 1
+                
+                if ticker in data.columns.levels[0]:
+                    ticker_data = data[ticker]
+                    
+                    if 'Close' in ticker_data.columns:
+                        # Добавляем линию цены
+                        fig.add_trace(
+                            go.Scatter(
+                                x=ticker_data.index,
+                                y=ticker_data['Close'],
+                                mode='lines',
+                                name=ticker,
+                                line=dict(color=colors[idx], width=2),
+                                showlegend=False
+                            ),
+                            row=row, col=col
+                        )
+            
+            fig.update_layout(
+                title="Quick Comparison Grid",
+                height=600,
+                showlegend=False
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Select at least 2 instruments for comparison view")
+    
+    # ==================== ВКЛАДКА 3: АНАЛИЗ ====================
+    with tab3:
+        st.subheader("Market Analysis")
+        
+        # Correlation analysis
+        if len(selected_tickers) > 1:
+            st.write("**Correlation Matrix**")
+            
+            # Extract close prices for correlation
+            close_prices = pd.DataFrame()
+            for ticker in selected_tickers:
+                if ticker in data.columns.levels[0]:
+                    close_prices[ticker] = data[ticker]['Close']
+            
+            if not close_prices.empty:
+                correlation_matrix = close_prices.corr()
+                
+                # Create heatmap
+                fig = px.imshow(
+                    correlation_matrix,
+                    text_auto='.2f',
+                    aspect="auto",
+                    color_continuous_scale='RdBu',
+                    zmin=-1,
+                    zmax=1,
+                    title="Correlation between Instruments"
+                )
+                
+                fig.update_layout(height=400)
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Correlation insights
+                st.write("**Correlation Insights:**")
+                
+                # Find highest and lowest correlations
+                corr_no_diag = correlation_matrix.copy()
+                np.fill_diagonal(corr_no_diag.values, np.nan)
+                
+                if not corr_no_diag.isna().all().all():
+                    max_corr = corr_no_diag.stack().max()
+                    min_corr = corr_no_diag.stack().min()
+                    avg_corr = corr_no_diag.stack().mean()
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Max Correlation", f"{max_corr:.3f}")
+                    with col2:
+                        st.metric("Min Correlation", f"{min_corr:.3f}")
+                    with col3:
+                        st.metric("Avg Correlation", f"{avg_corr:.3f}")
+        
+        # Performance summary
+        st.write("**Performance Summary**")
+        
+        # Расчет метрик для всех тикеров
+        metrics_data = []
+        
+        for ticker in selected_tickers:
+            if len(selected_tickers) == 1:
+                ticker_data = data
+            else:
+                if ticker in data.columns.levels[0]:
+                    ticker_data = data[ticker]
+                else:
+                    continue
+            
+            if 'Close' in ticker_data.columns:
+                close_prices = ticker_data['Close']
+                
+                # Calculate metrics
+                start_price = close_prices.iloc[0]
+                end_price = close_prices.iloc[-1]
+                total_return = ((end_price / start_price) - 1) * 100
+                
+                # Daily returns
+                daily_returns = close_prices.pct_change().dropna()
+                
+                # Volatility
+                volatility = daily_returns.std() * np.sqrt(252) * 100 if len(daily_returns) > 0 else 0
+                
+                # Sharpe ratio (assuming 0% risk-free rate)
+                sharpe = (daily_returns.mean() / daily_returns.std() * np.sqrt(252)) if len(daily_returns) > 0 and daily_returns.std() > 0 else 0
+                
+                # Max drawdown
+                cumulative = (1 + daily_returns).cumprod()
+                running_max = cumulative.expanding().max()
+                drawdown = (cumulative / running_max - 1).min() * 100
+                
+                metrics_data.append({
+                    'Ticker': ticker,
+                    'Start': start_price,
+                    'End': end_price,
+                    'Return %': total_return,
+                    'Volatility %': volatility,
+                    'Sharpe Ratio': sharpe,
+                    'Max Drawdown %': drawdown,
+                    'Days': len(close_prices)
+                })
+        
+        if metrics_data:
+            df_metrics = pd.DataFrame(metrics_data)
+            
+            # Display metrics in columns
+            cols = st.columns(len(df_metrics))
+            for idx, row in df_metrics.iterrows():
+                with cols[idx % len(cols)]:
+                    st.metric(
+                        label=row['Ticker'],
+                        value=f"{row['Return %']:.1f}%",
+                        delta=f"Vol: {row['Volatility %']:.1f}%"
+                    )
+            
+            # Detailed table
+            with st.expander("Detailed Metrics Table"):
+                # Format numeric columns
+                display_df = df_metrics.copy()
+                numeric_cols = ['Start', 'End', 'Return %', 'Volatility %', 'Sharpe Ratio', 'Max Drawdown %']
+                
+                for col in numeric_cols:
+                    if col in ['Return %', 'Volatility %', 'Max Drawdown %']:
+                        display_df[col] = display_df[col].apply(lambda x: f"{x:.2f}%")
+                    elif col == 'Sharpe Ratio':
+                        display_df[col] = display_df[col].apply(lambda x: f"{x:.2f}")
+                    else:
+                        display_df[col] = display_df[col].apply(lambda x: f"{x:.2f}")
+                
+                st.dataframe(display_df[['Ticker', 'Return %', 'Volatility %', 'Sharpe Ratio', 'Max Drawdown %', 'Days']], 
+                           use_container_width=True)
+    
+    # ==================== ВКЛАДКА 4: ДАННЫЕ ====================
+    with tab4:
+        st.subheader("Raw Data")
+        
+        # Показывать данные для выбранного тикера или всех
+        if len(selected_tickers) == 1:
+            selected_data_ticker = selected_tickers[0]
+            chart_data = data
+        else:
+            selected_data_ticker = st.selectbox(
+                "Select instrument to view data:",
+                selected_tickers,
+                index=0
+            )
+            if selected_data_ticker in data.columns.levels[0]:
+                chart_data = data[selected_data_ticker]
+            else:
+                chart_data = data
+        
+        # Show data preview
+        n_rows = st.slider("Show rows:", 10, 100, 20)
+        st.dataframe(chart_data.tail(n_rows))
+        
+        # Statistics
+        with st.expander("Statistics Summary"):
+            st.write(chart_data.describe())
+        
+        # Export
+        st.subheader("Export Data")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            csv_data = chart_data.to_csv()
+            st.download_button(
+                "📥 Download CSV",
+                csv_data,
+                f"{selected_data_ticker}_{datetime.now().strftime('%Y%m%d')}.csv",
+                "text/csv",
+                width='stretch'
+            )
+        
+        with col2:
+            if st.button("🔄 Refresh Analysis", width='stretch'):
+                st.rerun()
+
+else:
+    # Welcome screen
+    st.info("👋 Welcome to Market Dashboard!")
+    
+    # Информация о глобальной синхронизации
+    if GLOBAL_STATE_AVAILABLE and is_data_loaded():
+        global_data = get_global_data()
+        st.success(f"🌐 Global data available: {len(global_data['tickers'])} tickers from {global_data['market_type']}")
+        
+        if st.button("📊 Use Global Data", type="primary"):
+            st.session_state.market_data = global_data['price_data']
+            st.session_state.data_loaded = True
+            st.session_state.price_data = global_data['price_data']
+            st.session_state.selected_tickers = global_data['tickers']
+            st.rerun()
+        
+        st.markdown("---")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        ### Get Started:
+        
+        1. **Select Market Type** in the sidebar
+        2. **Choose Instruments** from the list or enter custom symbols
+        3. **Configure Settings** (period, interval, display)
+        4. **Click "Load Data"** to begin analysis
+        
+        ### Global Data Sync:
+        
+        📊 **Load Once, Use Everywhere**
+        - Data loaded here syncs to all other modules
+        - Technical Analysis uses the same data
+        - Portfolio Optimization works with these tickers
+        - Risk Analysis calculates metrics instantly
+        
+        ### New Features:
+        
+        📈 **Individual Charts Tab**
+        - Separate chart for each selected instrument
+        - Three display modes: One Chart, Side by Side, Grid View
+        - Technical indicators overlay
+        
+        📊 **Comparison View Tab**
+        - All instruments on one normalized chart
+        - Quick comparison grid
+        - Correlation analysis
+        
+        🔍 **Advanced Analysis**
+        - Performance metrics for each instrument
+        - Risk metrics (volatility, Sharpe ratio, drawdown)
+        - Correlation heatmap
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### Quick Start Examples:
+        
+        **Tech Stocks Analysis:**
+        - Market: Stocks
+        - Symbols: AAPL, MSFT, GOOGL, AMZN
+        - Period: 1 Year
+        - Display: Grid View
+        
+        **Crypto Market:**
+        - Market: Cryptocurrency
+        - Symbols: BTC-USD, ETH-USD, SOL-USD
+        - Period: 6 Months
+        - Display: Side by Side
+        
+        **Diversified Portfolio:**
+        - Market: Mixed
+        - Symbols: SPY (Stocks), GLD (Gold), TLT (Bonds)
+        - Period: 2 Years
+        - Display: Comparison View
+        """)
+        
+        if st.button("🚀 Load Tech Example", width='stretch'):
+            # Загружаем пример данных
+            selected_tickers = ['AAPL', 'MSFT', 'GOOGL']
+            data = create_demo_data(selected_tickers, 252)
+            
+            st.session_state.market_data = data
+            st.session_state.data_loaded = True
+            
+            # Синхронизируем с глобальным состоянием
+            if GLOBAL_STATE_AVAILABLE:
+                update_global_state(
+                    price_data=data,
+                    tickers=selected_tickers,
+                    market_type='Stocks',
+                    period='1y',
+                    interval='1d',
+                    source_page="Dashboard"
+                )
+            
+            st.rerun()
+
+# Footer
+st.markdown("---")
+
+# Информация о глобальном состоянии
+if GLOBAL_STATE_AVAILABLE:
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.caption(f"📅 {datetime.now().strftime('%Y-%m-%d')}")
+    with col2:
+        if is_data_loaded():
+            st.caption("🌐 Global Sync: Active")
+        else:
+            st.caption("🌐 Global Sync: Inactive")
+    with col3:
+        st.caption(f"📊 Modules: 6 integrated")
+    with col4:
+        st.caption("🚀 VV Markets Pro v3.0")
+else:
+    st.caption(f"Market Dashboard • {datetime.now().year} • Data: Yahoo Finance with Demo Fallback • Standalone Mode")
